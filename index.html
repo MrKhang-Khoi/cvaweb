@@ -2838,7 +2838,7 @@
         {
           id: "link-ky-so",
           title: "Ký số",
-          url: "https://mrkhang-khoi.github.io",
+          url: "https://mrkhang-khoi.github.io/cvakyso/",
           category: "tienich",
           color: "#4f46e5",
           iconChar: "KS",
@@ -2847,7 +2847,7 @@
         {
           id: "link-thoi-khoa-bieu",
           title: "Thời khóa biểu",
-          url: "https://mrkhang-khoi.github.io",
+          url: "https://mrkhang-khoi.github.io/tkb/",
           category: "tienich",
           color: "#2563eb",
           iconChar: "TK",
@@ -3134,7 +3134,7 @@
         }
       }
 
-      const DATA_VERSION = "1.7.0";
+      const DATA_VERSION = "1.8.0";
 
       async function initStorage() {
         try {
@@ -3532,7 +3532,10 @@
 
       function cleanUrl(url) {
         try {
-          return new URL(url).hostname.replace(/^www\./, "");
+          const parsed = new URL(url);
+          const host = parsed.hostname.replace(/^www\./, "");
+          const path = (parsed.pathname && parsed.pathname !== "/") ? parsed.pathname.replace(/\/$/, "") : "";
+          return host + path;
         } catch {
           return url;
         }
@@ -3945,7 +3948,7 @@
 
         return JSON.stringify({
           sync: "cva",
-          v: "1.7.0",
+          v: "1.8.0",
           co: catOrder,
           cc: customCats.length > 0 ? customCats : undefined,
           ld: linkDiffs.length > 0 ? linkDiffs : undefined,
