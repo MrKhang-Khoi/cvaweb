@@ -1,9 +1,9 @@
 /* ==========================================================================
    SERVICE WORKER: CỔNG WEBSITE GIÁO VIÊN (PWA OFFLINE-FIRST & AUTO-UPDATE)
-   Phiên bản: 1.6.0
+   Phiên bản: 1.7.0
    ========================================================================== */
 
-const CACHE_NAME = 'teacher-hub-v1.6.0';
+const CACHE_NAME = 'teacher-hub-v1.7.0';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

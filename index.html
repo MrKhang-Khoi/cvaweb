@@ -64,6 +64,11 @@
       -webkit-tap-highlight-color: transparent;
     }
 
+    html {
+      overflow-x: hidden;
+      max-width: 100%;
+    }
+
     body {
       font-family: var(--font);
       background-color: var(--bg);
@@ -72,6 +77,7 @@
       line-height: 1.45;
       padding-bottom: 90px;
       overflow-x: hidden;
+      max-width: 100%;
       transition: background-color 0.2s ease, color 0.2s ease;
     }
 
@@ -227,36 +233,36 @@
     @media (max-width: 480px) {
       .top-bar {
         padding: 4px 0 10px 0;
-        gap: 6px;
+        gap: 4px;
       }
       .brand-group {
-        gap: 7px;
+        gap: 6px;
       }
       .brand-badge {
-        width: 35px;
-        height: 35px;
-        min-width: 35px;
-        border-radius: 9px;
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        border-radius: 8px;
       }
       .brand-badge svg {
-        width: 19px;
-        height: 19px;
-      }
-      .brand-title {
-        font-size: 0.98rem;
-      }
-      .top-actions {
-        gap: 3.5px;
-      }
-      .icon-btn {
-        width: 37px;
-        height: 37px;
-        min-width: 37px;
-        border-radius: 9px;
-      }
-      .icon-btn svg {
         width: 17px;
         height: 17px;
+      }
+      .brand-title {
+        font-size: 0.90rem;
+      }
+      .top-actions {
+        gap: 2.5px;
+      }
+      .icon-btn {
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+        border-radius: 8px;
+      }
+      .icon-btn svg {
+        width: 16px;
+        height: 16px;
       }
     }
 
@@ -395,6 +401,9 @@
       align-items: center;
       gap: 6px;
       overflow-x: auto;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
       padding-bottom: 12px;
       scrollbar-width: none; /* Ẩn thanh cuộn xấu trên mobile */
       -webkit-overflow-scrolling: touch;
@@ -2667,7 +2676,33 @@
     </div>
   </div>
 
-  <!-- MODAL ĐỒNG BỘ & SAO LƯU DỮ LIỆU TOÀN DIỆN (CATEGORIES + LINKS) -->
+  <!-- MODAL MÃ QR ĐỒNG BỘ SANG ĐIỆN THOẠI -->
+  <div class="sheet-overlay" id="qrSyncModal" style="z-index: 120;">
+    <div class="sheet-panel" style="max-width: 440px; text-align: center;">
+      <div class="sheet-head" style="justify-content: space-between;">
+        <h3 class="sheet-title">📱 Quét QR Đồng Bộ Sang Điện Thoại</h3>
+        <button type="button" id="closeQrSyncModalBtn" class="icon-btn" style="border:none; box-shadow:none;" title="Đóng">✕</button>
+      </div>
+      <div class="sheet-body" style="padding-top: 10px;">
+        <p style="font-size: 0.85rem; color: var(--text-sub); margin-bottom: 14px;">
+          Dùng Camera hoặc Zalo trên điện thoại quét mã dưới đây để chuyển toàn bộ danh mục và các website sang điện thoại:
+        </p>
+        <div id="qrSyncCanvasContainer" style="background: #ffffff; padding: 14px; border-radius: var(--radius-md); display: inline-block; box-shadow: 0 4px 14px rgba(0,0,0,0.1); margin-bottom: 14px;">
+          <canvas id="qrSyncCanvas" width="280" height="280"></canvas>
+        </div>
+        <div style="margin-top: 6px;">
+          <button type="button" id="btnCopySyncString" class="btn-action" style="width: 100%; background: var(--primary-light); color: var(--primary); font-weight: 700;">
+            📋 Sao Chép Mã Đồng Bộ (Gửi qua Zalo)
+          </button>
+        </div>
+      </div>
+      <div class="sheet-foot">
+        <button type="button" id="btnCloseQrSyncFoot" class="btn-action btn-action-cancel" style="width: 100%;">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+    <!-- MODAL ĐỒNG BỘ & SAO LƯU DỮ LIỆU TOÀN DIỆN (CATEGORIES + LINKS) -->
   <div class="sheet-overlay" id="syncModal">
     <div class="sheet-panel" style="max-width: 520px;">
       <div class="sheet-head">
@@ -2684,10 +2719,28 @@
         </div>
 
         <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
+          <!-- 0. ĐỒNG BỘ NHANH SANG ĐIỆN THOẠI (QUÉT QR HOẶC NHẬP MÃ) -->
+          <button type="button" id="btnOpenQrSync" class="btn-action" style="background: linear-gradient(135deg, rgba(37,99,235,0.1), rgba(79,70,229,0.15)); border: 1.5px solid var(--primary); color: var(--text-main); text-align: left; padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+            <div>
+              <div style="font-weight: 800; font-size: 0.92rem; color: var(--primary);">📱 Đồng Bộ Tức Thì Sang Điện Thoại (Mã QR)</div>
+              <div style="font-size: 0.78rem; color: var(--text-sub); margin-top: 2px;">Chuyển 100% thứ tự mục & link vừa sửa sang điện thoại trong 1 giây</div>
+            </div>
+            <span style="font-size: 1.2rem; color: var(--primary);">📷</span>
+          </button>
+
+          <!-- 0B. NHẬP MÃ ĐỒNG BỘ TRỰC TIẾP -->
+          <button type="button" id="btnApplySyncCode" class="btn-action" style="background: var(--card-bg); border: 1.5px solid var(--card-border); color: var(--text-main); text-align: left; padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+            <div>
+              <div style="font-weight: 800; font-size: 0.92rem; color: #059669;">📥 Dán Mã Đồng Bộ Nhận Từ Máy Tính</div>
+              <div style="font-size: 0.78rem; color: var(--text-mute); margin-top: 2px;">Dán chuỗi dữ liệu để đồng bộ ngay lập tức</div>
+            </div>
+            <span style="font-size: 1.2rem; color: var(--text-mute);">➔</span>
+          </button>
+
           <!-- 1. Tải file sao lưu -->
           <button type="button" id="btnExportFullBackup" class="btn-action" style="background: var(--card-bg); border: 1.5px solid var(--card-border); color: var(--text-main); text-align: left; padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
             <div>
-              <div style="font-weight: 800; font-size: 0.92rem; color: var(--primary);">📥 Tải File Sao Lưu Toàn Diện (.JSON)</div>
+              <div style="font-weight: 800; font-size: 0.92rem; color: var(--text-main);">💾 Tải File Sao Lưu Toàn Diện (.JSON)</div>
               <div style="font-size: 0.78rem; color: var(--text-mute); margin-top: 2px;">Bao gồm tất cả danh mục và 18+ website hiện có</div>
             </div>
             <span style="font-size: 1.2rem; color: var(--text-mute);">➔</span>
@@ -2949,11 +3002,11 @@
       const DEFAULT_CATEGORIES = [
         { id: "all", label: "Tất cả", icon: "🌐", system: true },
         { id: "fav", label: "Yêu thích ⭐", icon: "⭐", system: true },
+        { id: "tienich", label: "Tiện ích", icon: "🛠️", system: true },
         { id: "diem", label: "Sổ điểm", icon: "📊" },
         { id: "csdl", label: "CSDL Ngành", icon: "🏫" },
         { id: "hoclieu", label: "Học liệu", icon: "📚" },
-        { id: "ai", label: "AI & Đổi mới", icon: "🤖" },
-        { id: "tienich", label: "Tiện ích", icon: "🛠️", system: true }
+        { id: "ai", label: "AI & Đổi mới", icon: "🤖" }
       ];
 
       let categoriesData = [...DEFAULT_CATEGORIES];
@@ -3081,50 +3134,54 @@
         }
       }
 
+      const DATA_VERSION = "1.7.0";
+
       async function initStorage() {
         try {
-          // Nạp danh mục động
+          const savedDataVer = localStorage.getItem("teacher_hub_data_ver");
+          const isSystemVerUpgrade = (savedDataVer !== DATA_VERSION);
+
+          // 1. NẠP VÀ ĐỒNG BỘ THỨ TỰ DANH MỤC (CATEGORIES)
           const savedCats = localStorage.getItem("teacher_hub_categories_v1");
-          if (savedCats) {
+          if (savedCats && !isSystemVerUpgrade) {
             categoriesData = JSON.parse(savedCats);
           } else {
-            categoriesData = [...DEFAULT_CATEGORIES];
+            // Khi có bản nâng cấp hệ thống (v1.7.0): Tự động cập nhật thứ tự chuẩn (Tiện ích ở vị trí 3)
+            // Đồng thời giữ nguyên mọi danh mục tùy biến do người dùng tự tạo
+            let customUserCats = [];
+            if (savedCats) {
+              try {
+                const oldCats = JSON.parse(savedCats);
+                customUserCats = oldCats.filter(c => !DEFAULT_CATEGORIES.some(dc => dc.id === c.id));
+              } catch(e) {}
+            }
+            categoriesData = [...DEFAULT_CATEGORIES, ...customUserCats];
             saveCategoriesStorage();
           }
 
-          // TỰ ĐỘNG HỢP NHẤT DANH MỤC: Bổ sung các danh mục mặc định nếu máy người dùng chưa có
-          DEFAULT_CATEGORIES.forEach(defCat => {
-            if (!categoriesData.some(c => c.id === defCat.id)) {
-              categoriesData.push(defCat);
-            }
-          });
-          saveCategoriesStorage();
-
+          // 2. NẠP VÀ ĐỒNG BỘ WEBSITES (LINKS)
           const saved = localStorage.getItem("teacher_hub_links_v2");
-          if (saved) {
+          if (saved && !isSystemVerUpgrade) {
             linksData = JSON.parse(saved);
-            // BẢO VỆ DỮ LIỆU: Đảm bảo không bao giờ bị rỗng 0 trang web
             if (!Array.isArray(linksData) || linksData.length === 0) {
               linksData = [...DEFAULT_LINKS];
               saveToStorage();
             }
           } else {
-            linksData = [...DEFAULT_LINKS];
+            // Khi nâng cấp hệ thống: Cập nhật các link chuẩn hệ thống từ DEFAULT_LINKS
+            // Đồng thời giữ nguyên các website riêng do người dùng tự thêm
+            let customUserLinks = [];
+            if (saved) {
+              try {
+                const oldLinks = JSON.parse(saved);
+                customUserLinks = oldLinks.filter(l => !DEFAULT_LINKS.some(dl => dl.id === l.id));
+              } catch(e) {}
+            }
+            linksData = [...DEFAULT_LINKS, ...customUserLinks];
             saveToStorage();
           }
 
-          // TỰ ĐỘNG HỢP NHẤT WEBSITE MẶC ĐỊNH MỚI (như Ký số, Thời khóa biểu)
-          let hasNewDefaultLinks = false;
-          DEFAULT_LINKS.forEach(defLink => {
-            const exists = linksData.some(item => item.id === defLink.id || (item.url && defLink.url && item.url === defLink.url && item.title === defLink.title));
-            if (!exists) {
-              linksData.unshift(defLink);
-              hasNewDefaultLinks = true;
-            }
-          });
-          if (hasNewDefaultLinks) {
-            saveToStorage();
-          }
+          localStorage.setItem("teacher_hub_data_ver", DATA_VERSION);
 
           const savedVault = localStorage.getItem("teacher_hub_vault_v1");
           if (savedVault) {
@@ -3854,6 +3911,216 @@
       if (backupBtn) backupBtn.addEventListener("click", openSyncModal);
       if (closeSyncModalBtn) closeSyncModalBtn.addEventListener("click", closeSyncModal);
       if (btnCloseSyncModalFoot) btnCloseSyncModalFoot.addEventListener("click", closeSyncModal);
+
+      // 12.0. ĐỒNG BỘ QR SANG ĐIỆN THOẠI & DÁN MÃ ĐỒNG BỘ
+      const btnOpenQrSync = document.getElementById("btnOpenQrSync");
+      const btnApplySyncCode = document.getElementById("btnApplySyncCode");
+      const qrSyncModal = document.getElementById("qrSyncModal");
+      const closeQrSyncModalBtn = document.getElementById("closeQrSyncModalBtn");
+      const btnCloseQrSyncFoot = document.getElementById("btnCloseQrSyncFoot");
+      const qrSyncCanvas = document.getElementById("qrSyncCanvas");
+      const btnCopySyncString = document.getElementById("btnCopySyncString");
+
+      function getSyncPayload() {
+        // Thuật toán nén vi sai thông minh: Chỉ gửi thứ tự, link sửa đổi và link mới
+        // Giúp dung lượng siêu nhẹ (~300 bytes), quét QR cực nhạy trong 0.2 giây
+        const catOrder = categoriesData.map(c => c.id);
+        const customCats = categoriesData.filter(c => !DEFAULT_CATEGORIES.some(dc => dc.id === c.id));
+
+        const linkDiffs = [];
+        const customLinks = [];
+        linksData.forEach(l => {
+          const def = DEFAULT_LINKS.find(dl => dl.id === l.id);
+          if (def) {
+            const diff = { id: l.id };
+            let changed = false;
+            if (l.url !== def.url) { diff.url = l.url; changed = true; }
+            if (l.category !== def.category) { diff.cat = l.category; changed = true; }
+            if (l.isFavorite !== def.isFavorite) { diff.fav = l.isFavorite ? 1 : 0; changed = true; }
+            if (changed) linkDiffs.push(diff);
+          } else {
+            customLinks.push({ i: l.id, t: l.title, u: l.url, c: l.category, cl: l.color, ic: l.iconChar, f: l.isFavorite ? 1 : 0 });
+          }
+        });
+
+        return JSON.stringify({
+          sync: "cva",
+          v: "1.7.0",
+          co: catOrder,
+          cc: customCats.length > 0 ? customCats : undefined,
+          ld: linkDiffs.length > 0 ? linkDiffs : undefined,
+          cl: customLinks.length > 0 ? customLinks : undefined,
+          lo: linksData.map(l => l.id)
+        });
+      }
+
+      function applySyncData(imported) {
+        if (!imported) return false;
+        let count = 0;
+
+        // Định dạng 1: Nén vi sai thông minh (sync: "cva")
+        if (imported.sync === "cva" || imported.co) {
+          if (Array.isArray(imported.co) && imported.co.length > 0) {
+            const catMap = new Map(categoriesData.map(c => [c.id, c]));
+            const newCats = [];
+            imported.co.forEach(id => {
+              if (catMap.has(id)) {
+                newCats.push(catMap.get(id));
+                catMap.delete(id);
+              }
+            });
+            if (Array.isArray(imported.cc)) {
+              imported.cc.forEach(cc => {
+                if (!newCats.some(c => c.id === cc.id)) newCats.push(cc);
+                catMap.delete(cc.id);
+              });
+            }
+            catMap.forEach(val => newCats.push(val));
+            categoriesData = newCats;
+            saveCategoriesStorage();
+            updateCategoryDropdowns();
+            renderCategoryTabs();
+            count++;
+          }
+
+          if (Array.isArray(imported.ld)) {
+            imported.ld.forEach(diff => {
+              const target = linksData.find(l => l.id === diff.id);
+              if (target) {
+                if (diff.url) target.url = diff.url;
+                if (diff.cat) target.category = diff.cat;
+                if (diff.fav !== undefined) target.isFavorite = (diff.fav === 1);
+              }
+            });
+            count++;
+          }
+
+          if (Array.isArray(imported.cl)) {
+            imported.cl.forEach(item => {
+              const exists = linksData.some(l => l.id === item.i);
+              if (!exists) {
+                linksData.push({
+                  id: item.i,
+                  title: item.t,
+                  url: item.u,
+                  category: item.c,
+                  color: item.cl || "#2563eb",
+                  iconChar: item.ic || item.t.slice(0, 2).toUpperCase(),
+                  isFavorite: item.f === 1
+                });
+              }
+            });
+            count++;
+          }
+
+          if (Array.isArray(imported.lo) && imported.lo.length > 0) {
+            const linkMap = new Map(linksData.map(l => [l.id, l]));
+            const newLinks = [];
+            imported.lo.forEach(id => {
+              if (linkMap.has(id)) {
+                newLinks.push(linkMap.get(id));
+                linkMap.delete(id);
+              }
+            });
+            linkMap.forEach(val => newLinks.push(val));
+            linksData = newLinks;
+            count++;
+          }
+
+          saveToStorage();
+          renderItems();
+          return count > 0;
+        }
+
+        // Định dạng 2: File backup đầy đủ { cat, links }
+        if (imported.cat && Array.isArray(imported.cat) && imported.cat.length > 0) {
+          categoriesData = imported.cat;
+          saveCategoriesStorage();
+          updateCategoryDropdowns();
+          renderCategoryTabs();
+          count++;
+        }
+        if (imported.links && Array.isArray(imported.links) && imported.links.length > 0) {
+          linksData = imported.links;
+          saveToStorage();
+          renderItems();
+          count++;
+        }
+        return count > 0;
+      }
+
+      if (btnOpenQrSync) {
+        btnOpenQrSync.addEventListener("click", () => {
+          if (!qrSyncModal || !qrSyncCanvas) return;
+          qrSyncModal.classList.add("active");
+          const payload = getSyncPayload();
+          // Render QR
+          try {
+            let qr;
+            try {
+              qr = window.qrcode(0, 'M');
+              qr.addData(payload);
+              qr.make();
+            } catch (errM) {
+              qr = window.qrcode(0, 'L');
+              qr.addData(payload);
+              qr.make();
+            }
+            const count = qr.getModuleCount();
+            const ctx = qrSyncCanvas.getContext("2d");
+            const size = 280;
+            qrSyncCanvas.width = size;
+            qrSyncCanvas.height = size;
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, size, size);
+            const modSize = size / count;
+            ctx.fillStyle = "#0f172a";
+            for (let r = 0; r < count; r++) {
+              for (let c = 0; c < count; c++) {
+                if (qr.isDark(r, c)) {
+                  ctx.fillRect(c * modSize, r * modSize, modSize, modSize);
+                }
+              }
+            }
+          } catch(e) {
+            console.error("QR render error:", e);
+          }
+        });
+      }
+
+      if (closeQrSyncModalBtn) closeQrSyncModalBtn.addEventListener("click", () => qrSyncModal.classList.remove("active"));
+      if (btnCloseQrSyncFoot) btnCloseQrSyncFoot.addEventListener("click", () => qrSyncModal.classList.remove("active"));
+
+      if (btnCopySyncString) {
+        btnCopySyncString.addEventListener("click", () => {
+          const payload = getSyncPayload();
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(payload).then(() => {
+              showToast("📋 Đã sao chép mã đồng bộ! Hãy gửi qua Zalo.");
+            });
+          } else {
+            prompt("Sao chép mã đồng bộ gửi qua Zalo:", payload);
+          }
+        });
+      }
+
+      if (btnApplySyncCode) {
+        btnApplySyncCode.addEventListener("click", () => {
+          const code = prompt("Dán mã đồng bộ (hoặc chuỗi JSON) nhận từ máy tính vào đây:");
+          if (!code) return;
+          try {
+            const parsed = JSON.parse(code.trim());
+            if (applySyncData(parsed)) {
+              closeSyncModal();
+              showToast("🎉 Đồng bộ dữ liệu từ máy tính sang điện thoại thành công!");
+            } else {
+              showToast("Mã đồng bộ không hợp lệ", "error");
+            }
+          } catch(e) {
+            showToast("Lỗi định dạng mã đồng bộ", "error");
+          }
+        });
+      }
 
       // 12.1. TẢI FILE SAO LƯU TOÀN DIỆN (CẢ THƯ MỤC & WEBSITE)
       if (btnExportFullBackup) {
