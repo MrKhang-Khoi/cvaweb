@@ -89,12 +89,17 @@
     .mobile-shell {
       max-width: 800px;
       margin: 0 auto;
-      padding: 12px 14px;
+      padding: 12px 14px 96px 14px; /* Khoảng đệm đáy an toàn chống che khuất nội dung */
+      position: relative;
     }
 
-    @media (min-width: 640px) {
+    @media (min-width: 768px) {
       .mobile-shell {
-        padding: 20px 24px;
+        padding: 20px 24px 36px 24px;
+      }
+      /* Trên màn hình Desktop/Tablet: Đã có thanh danh mục trên đỉnh, ẩn hoàn toàn bottom dock */
+      .bottom-dock {
+        display: none !important;
       }
     }
 
@@ -117,13 +122,15 @@
     .brand-group {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       min-width: 0;
+      flex-shrink: 0;
     }
 
     .brand-badge {
-      width: 42px;
-      height: 42px;
+      width: 38px;
+      height: 38px;
+      min-width: 38px;
       border-radius: var(--radius-md);
       background: linear-gradient(135deg, #2563eb, #3b82f6);
       color: #ffffff;
@@ -131,60 +138,90 @@
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
     }
 
     .brand-text {
       min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
 
     .brand-title {
-      font-size: 1.05rem;
+      font-size: 1.08rem;
       font-weight: 800;
       color: var(--text-main);
-      line-height: 1.2;
+      line-height: 1.15;
+      white-space: nowrap;
+      letter-spacing: -0.2px;
     }
 
-    .brand-sub {
-      font-size: 0.76rem;
-      color: var(--text-mute);
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 1px;
-    }
-
-    .live-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #10b981;
-      display: inline-block;
+    @media (max-width: 640px) {
+      .brand-title-extra {
+        display: none;
+      }
     }
 
     .top-actions {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
       flex-shrink: 0;
     }
 
     @media (max-width: 480px) {
-      .top-actions {
-        gap: 3px;
+      .top-bar {
+        padding: 4px 0 10px 0;
+        gap: 6px;
       }
-      .brand-title {
-        font-size: 0.96rem;
-        white-space: nowrap;
+      .brand-group {
+        gap: 7px;
       }
       .brand-badge {
-        width: 38px;
-        height: 38px;
+        width: 35px;
+        height: 35px;
+        min-width: 35px;
+        border-radius: 9px;
+      }
+      .brand-badge svg {
+        width: 19px;
+        height: 19px;
+      }
+      .brand-title {
+        font-size: 0.98rem;
+      }
+      .top-actions {
+        gap: 3.5px;
       }
       .icon-btn {
-        width: 40px;
-        height: 40px;
+        width: 37px;
+        height: 37px;
+        min-width: 37px;
+        border-radius: 9px;
+      }
+      .icon-btn svg {
+        width: 17px;
+        height: 17px;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .brand-title {
+        font-size: 0.91rem;
+      }
+      .brand-badge {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+      }
+      .icon-btn {
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+      }
+      .top-actions {
+        gap: 2px;
       }
     }
 
@@ -898,11 +935,11 @@
        ========================================================================== */
     .bottom-dock {
       position: fixed;
-      bottom: 12px;
+      bottom: calc(12px + env(safe-area-inset-bottom, 0px));
       left: 50%;
       transform: translateX(-50%);
       width: calc(100% - 24px);
-      max-width: 500px;
+      max-width: 480px;
       background: var(--card-bg);
       border: 1px solid var(--card-border);
       border-radius: var(--radius-full);
@@ -910,9 +947,24 @@
       display: flex;
       align-items: center;
       justify-content: space-around;
-      box-shadow: var(--shadow-modal);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
       z-index: 50;
-      backdrop-filter: blur(12px);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease;
+      will-change: transform, opacity;
+    }
+
+    .bottom-dock.dock-hidden {
+      transform: translate(-50%, calc(100% + 24px)) !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
+    .scroll-clearance-spacer {
+      height: 32px;
+      width: 100%;
+      pointer-events: none;
     }
 
     .dock-tab {
@@ -1641,11 +1693,7 @@
           </svg>
         </div>
         <div class="brand-text">
-          <h1 class="brand-title">Cổng Website Giáo Viên</h1>
-          <p class="brand-sub">
-            <span class="live-dot"></span>
-            <span id="screenDeviceTag">Tối giản một chạm</span>
-          </p>
+          <h1 class="brand-title">Cổng Website <span class="brand-title-extra">Giáo Viên</span></h1>
         </div>
       </div>
 
@@ -1818,6 +1866,9 @@
     <main id="portalContainer" class="item-list">
       <!-- Injected via JS -->
     </main>
+
+    <!-- ĐỆM CUỘN AN TOÀN CHỐNG CHE KHUẤT CÁC MỤC CUỐI -->
+    <div class="scroll-clearance-spacer" aria-hidden="true"></div>
 
   </div>
 
@@ -2695,9 +2746,6 @@
 
       async function initStorage() {
         try {
-          // Tự động chuyển đổi mật khẩu sang chuẩn Salted SHA-256 & xóa bỏ văn bản thô
-          await checkAndMigrateAdminPin();
-
           // Nạp danh mục động
           const savedCats = localStorage.getItem("teacher_hub_categories_v1");
           if (savedCats) {
@@ -2740,6 +2788,12 @@
         }
 
         updateCategoryDropdowns();
+        renderCategoryTabs();
+        syncBottomDock();
+        renderItems();
+
+        // Di chuyển bảo mật mật khẩu ngầm trong nền
+        await checkAndMigrateAdminPin();
       }
 
       function saveToStorage() {
@@ -3512,17 +3566,36 @@
         }, 2200);
       }
 
-      // 15. THIẾT BỊ
-      function updateDeviceLabel() {
-        const tag = document.getElementById("screenDeviceTag");
-        if (!tag) return;
-        const w = window.innerWidth;
-        if (w <= 480) tag.textContent = "Tối giản cho Điện thoại";
-        else if (w <= 768) tag.textContent = "Máy tính bảng";
-        else tag.textContent = "Máy tính / SmartBoard";
-      }
+      // 15. ĐIỀU HƯỚNG THÔNG MINH: TỰ ĐỘNG ẨN/HIỆN BOTTOM DOCK KHI CUỘN TRÊN ĐIỆN THOẠI
+      let lastScrollTop = 0;
+      let scrollTimer = null;
+      const bottomDockEl = document.querySelector(".bottom-dock");
 
-      window.addEventListener("resize", updateDeviceLabel);
+      if (bottomDockEl) {
+        window.addEventListener("scroll", () => {
+          const st = window.pageYOffset || document.documentElement.scrollTop;
+          const windowHeight = window.innerHeight;
+          const docHeight = document.documentElement.scrollHeight;
+
+          // Nếu ở đỉnh trang (< 35px) hoặc sát đáy (cách đáy < 80px), luôn hiện dock
+          if (st < 35 || (st + windowHeight >= docHeight - 80)) {
+            bottomDockEl.classList.remove("dock-hidden");
+          } else if (st > lastScrollTop && st > 70) {
+            // Đang cuộn xuống -> ẩn dock để giải phóng không gian màn hình
+            bottomDockEl.classList.add("dock-hidden");
+          } else if (st < lastScrollTop - 6) {
+            // Đang cuộn ngược lên -> hiện dock để đổi tab
+            bottomDockEl.classList.remove("dock-hidden");
+          }
+          lastScrollTop = Math.max(0, st);
+
+          // Khi người dùng dừng cuộn 900ms -> hiện lại dock nhẹ nhàng
+          clearTimeout(scrollTimer);
+          scrollTimer = setTimeout(() => {
+            bottomDockEl.classList.remove("dock-hidden");
+          }, 900);
+        }, { passive: true });
+      }
 
       window.teacherPortal = {
         openAddSheet,
@@ -4957,8 +5030,7 @@
       renderItems();
       updateClock();
       setInterval(updateClock, 1000);
-      updateDeviceLabel();
-
+      
     })();
   </script>
 </body>
