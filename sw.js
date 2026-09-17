@@ -1,9 +1,9 @@
 /* ==========================================================================
    SERVICE WORKER: CỔNG WEBSITE GIÁO VIÊN (PWA OFFLINE-FIRST & AUTO-UPDATE)
-   Phiên bản: 1.4.0
+   Phiên bản: 1.5.0
    ========================================================================== */
 
-const CACHE_NAME = 'teacher-hub-v1.4.0';
+const CACHE_NAME = 'teacher-hub-v1.5.0';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -18,9 +18,6 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
       return cache.addAll(ASSETS_TO_CACHE);
-    }).then(() => {
-      // Tự động kích hoạt ngay nếu được yêu cầu
-      return self.skipWaiting();
     })
   );
 });

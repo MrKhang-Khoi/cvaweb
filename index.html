@@ -95,11 +95,65 @@
 
     @media (min-width: 768px) {
       .mobile-shell {
-        padding: 20px 24px 36px 24px;
+        max-width: 1020px !important;
+        padding: 24px 32px 48px 32px !important;
       }
       /* Trên màn hình Desktop/Tablet: Đã có thanh danh mục trên đỉnh, ẩn hoàn toàn bottom dock */
       .bottom-dock {
         display: none !important;
+      }
+      /* BỐ CỤC 2 CỘT CÂN ĐỐI CHO DANH SÁCH WEB TRÊN MÁY TÍNH (Chấm dứt việc thẻ bị kéo dẹt) */
+      .item-list {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 12px 16px !important;
+      }
+      /* Hover hiệu ứng Desktop cao cấp cho Chuột máy tính */
+      .list-item-card {
+        min-height: 68px;
+        transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease !important;
+      }
+      .list-item-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 22px rgba(37, 99, 235, 0.14), 0 2px 6px rgba(0, 0, 0, 0.04);
+        border-color: rgba(37, 99, 235, 0.45);
+        background-color: var(--card-hover);
+      }
+      .grid-item-card {
+        transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease !important;
+      }
+      .grid-item-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 24px rgba(37, 99, 235, 0.16);
+        border-color: rgba(37, 99, 235, 0.45);
+      }
+      .item-grid {
+        grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)) !important;
+        gap: 14px !important;
+      }
+      .mini-greeting-chip {
+        padding: 10px 18px;
+        margin-bottom: 16px;
+      }
+      .search-row {
+        margin-bottom: 16px;
+      }
+      .phone-search-input {
+        min-height: 50px;
+        font-size: 1rem;
+      }
+      .cat-pill {
+        padding: 8px 18px;
+        font-size: 0.88rem;
+      }
+    }
+
+    @media (min-width: 1280px) {
+      .mobile-shell {
+        max-width: 1120px !important;
+      }
+      .item-list {
+        gap: 14px 20px !important;
       }
     }
 
@@ -2577,6 +2631,102 @@
   </div>
 
   
+  <!-- MODAL THÔNG BÁO ỨNG DỤNG ĐÃ ĐƯỢC CÀI ĐẶT -->
+  <div class="sheet-overlay" id="installedAppModal">
+    <div class="sheet-panel" style="max-width: 460px; text-align: center;">
+      <div class="sheet-head" style="justify-content: flex-end; border-bottom: none; padding-bottom: 0;">
+        <button type="button" id="closeInstalledAppModalBtn" class="icon-btn" style="border:none; box-shadow:none;" title="Đóng">✕</button>
+      </div>
+      <div class="sheet-body" style="padding-top: 0;">
+        <div style="width: 68px; height: 68px; border-radius: 50%; background: rgba(5, 150, 105, 0.12); color: #059669; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px auto;">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--text-main); margin-bottom: 8px;">
+          Ứng Dụng Đã Cài Đặt Sẵn Sàng!
+        </h3>
+        <p style="font-size: 0.88rem; color: var(--text-sub); line-height: 1.5; margin-bottom: 16px;">
+          Thầy/Cô đang sử dụng <strong>Cổng Website Giáo Viên</strong> ở chế độ ứng dụng độc lập (Standalone PWA App).
+        </p>
+        <div style="background: var(--bg); border: 1px solid var(--card-border); border-radius: var(--radius-md); padding: 12px 14px; text-align: left; font-size: 0.82rem; color: var(--text-sub); margin-bottom: 18px; line-height: 1.6;">
+          <div style="font-weight: 700; color: var(--text-main); margin-bottom: 6px;">💡 Thầy/Cô có thể:</div>
+          <div>🖥️ <strong>Máy tính:</strong> Mở nhanh từ biểu tượng ngoài Desktop, thanh Taskbar hoặc menu Start mà không cần mở trình duyệt web.</div>
+          <div>📱 <strong>Điện thoại:</strong> Mở trực tiếp từ màn hình chính như ứng dụng Zalo, Facebook.</div>
+          <div>📶 <strong>Ngoại tuyến:</strong> Tra cứu Sổ tay mật khẩu và danh bạ web ngay cả khi không có mạng Internet.</div>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button type="button" id="btnCheckAppUpdateNow" class="btn-action" style="flex: 1; background: var(--primary-light); color: var(--primary); font-weight: 700;">
+            🔄 Kiểm Tra Cập Nhật
+          </button>
+          <button type="button" id="btnConfirmInstalledModal" class="btn-action btn-action-primary" style="flex: 1;">
+            Đã Hiểu
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL ĐỒNG BỘ & SAO LƯU DỮ LIỆU TOÀN DIỆN (CATEGORIES + LINKS) -->
+  <div class="sheet-overlay" id="syncModal">
+    <div class="sheet-panel" style="max-width: 520px;">
+      <div class="sheet-head">
+        <h3 class="sheet-title">🔄 Trung Tâm Đồng Bộ & Sao Lưu</h3>
+        <button type="button" id="closeSyncModalBtn" class="icon-btn" style="border:none; box-shadow:none;" title="Đóng">✕</button>
+      </div>
+      <div class="sheet-body">
+        <div class="vault-safe-banner" style="background: rgba(37, 99, 235, 0.08); border-color: rgba(37, 99, 235, 0.3);">
+          <span style="font-size: 1.1rem;">🌐</span>
+          <div>
+            <strong>Đồng bộ trên mọi thiết bị:</strong><br>
+            Sao lưu toàn bộ danh mục và các website để chuyển sang điện thoại hoặc máy tính khác chỉ trong 1 giây.
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
+          <!-- 1. Tải file sao lưu -->
+          <button type="button" id="btnExportFullBackup" class="btn-action" style="background: var(--card-bg); border: 1.5px solid var(--card-border); color: var(--text-main); text-align: left; padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+            <div>
+              <div style="font-weight: 800; font-size: 0.92rem; color: var(--primary);">📥 Tải File Sao Lưu Toàn Diện (.JSON)</div>
+              <div style="font-size: 0.78rem; color: var(--text-mute); margin-top: 2px;">Bao gồm tất cả danh mục và 18+ website hiện có</div>
+            </div>
+            <span style="font-size: 1.2rem; color: var(--text-mute);">➔</span>
+          </button>
+
+          <!-- 2. Nhập file sao lưu -->
+          <button type="button" id="btnImportFullBackup" class="btn-action" style="background: var(--card-bg); border: 1.5px solid var(--card-border); color: var(--text-main); text-align: left; padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+            <div>
+              <div style="font-weight: 800; font-size: 0.92rem; color: #059669;">📤 Nhập Dữ Liệu Từ File (.JSON)</div>
+              <div style="font-size: 0.78rem; color: var(--text-mute); margin-top: 2px;">Đồng bộ dữ liệu từ thiết bị khác vào máy này (Yêu cầu PIN Admin)</div>
+            </div>
+            <span style="font-size: 1.2rem; color: var(--text-mute);">➔</span>
+          </button>
+
+          <!-- 3. Xuất mã nguồn GitHub (Dành cho Admin) -->
+          <button type="button" id="btnExportGitHubConfig" class="btn-action" style="background: var(--card-bg); border: 1.5px solid var(--card-border); color: var(--text-main); text-align: left; padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+            <div>
+              <div style="font-weight: 800; font-size: 0.92rem; color: #d97706;">👑 Xuất Cấu Hình Đưa Lên GitHub (Admin)</div>
+              <div style="font-size: 0.78rem; color: var(--text-mute); margin-top: 2px;">Sao chép mã dữ liệu để phát hành bản cập nhật cho toàn trường</div>
+            </div>
+            <span style="font-size: 1.2rem; color: var(--text-mute);">➔</span>
+          </button>
+
+          <!-- 4. Khôi phục mặc định -->
+          <button type="button" id="btnRestoreOriginalDefaults" class="btn-action" style="background: var(--card-bg); border: 1.5px solid var(--card-border); color: var(--text-main); text-align: left; padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+            <div>
+              <div style="font-weight: 800; font-size: 0.92rem; color: var(--danger);">🔄 Khôi Phục Dữ Liệu Chuẩn Trường & Bộ (18 Web)</div>
+              <div style="font-size: 0.78rem; color: var(--text-mute); margin-top: 2px;">Thiết lập lại danh sách 18 trang web chuẩn ban đầu</div>
+            </div>
+            <span style="font-size: 1.2rem; color: var(--text-mute);">➔</span>
+          </button>
+        </div>
+      </div>
+      <div class="sheet-foot">
+        <button type="button" id="btnCloseSyncModalFoot" class="btn-action btn-action-cancel" style="width: 100%;">Đóng Hộp Thoại</button>
+      </div>
+    </div>
+  </div>
+
   <!-- OVERLAY LOADING KHI CẬP NHẬT PHIÊN BẢN MỚI -->
   <div class="sheet-overlay update-loading-overlay" id="updateLoadingOverlay">
     <div class="update-loading-card">
@@ -2622,6 +2772,24 @@
 
       // 1. DANH SÁCH CHUẨN MẪU NGÀNH GIÁO DỤC VIỆT NAM
       const DEFAULT_LINKS = [
+        {
+          id: "link-ky-so",
+          title: "Ký số",
+          url: "https://mrkhang-khoi.github.io",
+          category: "tienich",
+          color: "#4f46e5",
+          iconChar: "KS",
+          isFavorite: false
+        },
+        {
+          id: "link-thoi-khoa-bieu",
+          title: "Thời khóa biểu",
+          url: "https://mrkhang-khoi.github.io",
+          category: "tienich",
+          color: "#2563eb",
+          iconChar: "TK",
+          isFavorite: false
+        },
         {
           id: "link-csdl-moet",
           title: "Cơ Sở Dữ Liệu Ngành GD&ĐT",
@@ -2916,6 +3084,14 @@
             saveCategoriesStorage();
           }
 
+          // TỰ ĐỘNG HỢP NHẤT DANH MỤC: Bổ sung các danh mục mặc định nếu máy người dùng chưa có
+          DEFAULT_CATEGORIES.forEach(defCat => {
+            if (!categoriesData.some(c => c.id === defCat.id)) {
+              categoriesData.push(defCat);
+            }
+          });
+          saveCategoriesStorage();
+
           const saved = localStorage.getItem("teacher_hub_links_v2");
           if (saved) {
             linksData = JSON.parse(saved);
@@ -2926,6 +3102,19 @@
             }
           } else {
             linksData = [...DEFAULT_LINKS];
+            saveToStorage();
+          }
+
+          // TỰ ĐỘNG HỢP NHẤT WEBSITE MẶC ĐỊNH MỚI (như Ký số, Thời khóa biểu)
+          let hasNewDefaultLinks = false;
+          DEFAULT_LINKS.forEach(defLink => {
+            const exists = linksData.some(item => item.id === defLink.id || (item.url && defLink.url && item.url === defLink.url && item.title === defLink.title));
+            if (!exists) {
+              linksData.unshift(defLink);
+              hasNewDefaultLinks = true;
+            }
+          });
+          if (hasNewDefaultLinks) {
             saveToStorage();
           }
 
@@ -3636,81 +3825,154 @@
         });
       });
 
-      // 12. SAO LƯU & NHẬP LINK (BẢO VỆ ADMIN)
+      // 12. SAO LƯU & TRUNG TÂM ĐỒNG BỘ TOÀN DIỆN (CATEGORIES + LINKS)
       const backupBtn = document.getElementById("phoneBackupBtn");
+      const syncModal = document.getElementById("syncModal");
+      const closeSyncModalBtn = document.getElementById("closeSyncModalBtn");
+      const btnCloseSyncModalFoot = document.getElementById("btnCloseSyncModalFoot");
+      const btnExportFullBackup = document.getElementById("btnExportFullBackup");
+      const btnImportFullBackup = document.getElementById("btnImportFullBackup");
+      const btnExportGitHubConfig = document.getElementById("btnExportGitHubConfig");
+      const btnRestoreOriginalDefaults = document.getElementById("btnRestoreOriginalDefaults");
       const fileInput = document.getElementById("phoneFileInput");
 
-      backupBtn.addEventListener("click", () => {
-        const choice = prompt(
-          "HỆ THỐNG ĐỒNG BỘ LIÊN KẾT:\n" +
-          "1. Gõ 1: SAO LƯU (Tải file json về máy - Dành cho mọi giáo viên)\n" +
-          "2. Gõ 2: NHẬP LINK từ file (Yêu cầu mật khẩu Admin)\n" +
-          "3. Gõ 3: KHÔI PHỤC mẫu web gốc của Bộ (Yêu cầu mật khẩu Admin)",
-          "1"
-        );
-        if (choice === "1") {
+      function openSyncModal() {
+        if (syncModal) syncModal.classList.add("active");
+      }
+      function closeSyncModal() {
+        if (syncModal) syncModal.classList.remove("active");
+      }
+
+      if (backupBtn) backupBtn.addEventListener("click", openSyncModal);
+      if (closeSyncModalBtn) closeSyncModalBtn.addEventListener("click", closeSyncModal);
+      if (btnCloseSyncModalFoot) btnCloseSyncModalFoot.addEventListener("click", closeSyncModal);
+
+      // 12.1. TẢI FILE SAO LƯU TOÀN DIỆN (CẢ THƯ MỤC & WEBSITE)
+      if (btnExportFullBackup) {
+        btnExportFullBackup.addEventListener("click", () => {
           try {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(linksData, null, 2));
+            const fullBundle = {
+              app: "Cổng Website Giáo Viên",
+              version: "1.5.0",
+              exportedAt: new Date().toISOString(),
+              categories: categoriesData,
+              links: linksData
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullBundle, null, 2));
             const dl = document.createElement("a");
             dl.setAttribute("href", dataStr);
-            dl.setAttribute("download", `web-giao-vien-${new Date().toISOString().slice(0,10)}.json`);
+            dl.setAttribute("download", `cvaweb-backup-${new Date().toISOString().slice(0,10)}.json`);
             document.body.appendChild(dl);
             dl.click();
             dl.remove();
-            showToast("Đã tải file sao lưu về máy!");
+            showToast("✅ Đã tải file sao lưu đầy đủ về thiết bị!");
           } catch(e) {
-            showToast("Lỗi sao lưu", "error");
+            showToast("Lỗi khi sao lưu dữ liệu", "error");
           }
-        } else if (choice === "2") {
-          if (!isAdminLoggedIn) {
-            const pass = prompt("🔐 Nhập mật khẩu Admin để có quyền nhập file:");
-            if (pass !== adminPin) {
-              showToast("❌ Sai mật khẩu Admin! Bạn không có quyền nhập đè link.", "error");
-              return;
-            }
-          }
-          fileInput.click();
-        } else if (choice === "3") {
-          if (!isAdminLoggedIn) {
-            const pass = prompt("🔐 Nhập mật khẩu Admin để khôi phục danh sách gốc:");
-            if (pass !== adminPin) {
-              showToast("❌ Sai mật khẩu Admin! Bạn không có quyền khôi phục.", "error");
-              return;
-            }
-          }
-          if (confirm("Khôi phục danh sách website chuẩn ban đầu của Bộ GD&ĐT?")) {
-            linksData = [...DEFAULT_LINKS];
-            saveToStorage();
-            renderItems();
-            showToast("Đã khôi phục danh sách chuẩn!");
-          }
-        }
-      });
+        });
+      }
 
-      fileInput.addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          try {
-            const parsed = JSON.parse(event.target.result);
-            const imported = Array.isArray(parsed) ? parsed : (parsed.links || []);
-            if (imported.length > 0) {
-              linksData = imported;
-              saveToStorage();
-              renderItems();
-              showToast(`Đã nạp ${imported.length} website thành công!`);
-            } else {
-              showToast("File không có danh sách hợp lệ", "error");
+      // 12.2. NHẬP DỮ LIỆU TỪ FILE JSON (YÊU CẦU QUYỀN ADMIN)
+      if (btnImportFullBackup) {
+        btnImportFullBackup.addEventListener("click", async () => {
+          if (!isAdminLoggedIn) {
+            const entered = prompt("🔐 Nhập mật khẩu Admin để có quyền nhập đè dữ liệu:");
+            if (!entered) return;
+            const hashed = await hashPassword(entered, adminSalt);
+            if (hashed !== adminHash && entered !== adminPin) {
+              showToast("❌ Sai mật khẩu Admin! Bạn không có quyền nhập file.", "error");
+              return;
             }
-          } catch(err) {
-            showToast("Lỗi đọc file json", "error");
-          } finally {
-            fileInput.value = "";
           }
-        };
-        reader.readAsText(file);
-      });
+          if (fileInput) fileInput.click();
+        });
+      }
+
+      // 12.3. XUẤT CẤU HÌNH ĐỒNG BỘ LÊN GITHUB (ADMIN)
+      if (btnExportGitHubConfig) {
+        btnExportGitHubConfig.addEventListener("click", () => {
+          const exportData = {
+            categories: categoriesData,
+            links: linksData
+          };
+          const jsonStr = JSON.stringify(exportData, null, 2);
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(jsonStr).then(() => {
+              alert("👑 ĐÃ SAO CHÉP CẤU HÌNH ĐỒNG BỘ!\n\nThầy/Cô đã sao chép toàn bộ dữ liệu Danh mục và " + linksData.length + " website vào bộ nhớ tạm (Clipboard).\n\nThầy/Cô chỉ cần dán (Ctrl+V) gửi cho Antigravity hoặc lập trình viên để cập nhật lên GitHub repository, tất cả giáo viên toàn trường sẽ nhận được bản mới tức thì!");
+            }).catch(() => {
+              prompt("Sao chép mã JSON này gửi lên GitHub:", jsonStr);
+            });
+          } else {
+            prompt("Sao chép mã JSON này gửi lên GitHub:", jsonStr);
+          }
+        });
+      }
+
+      // 12.4. KHÔI PHỤC DỮ LIỆU GỐC 18 WEB
+      if (btnRestoreOriginalDefaults) {
+        btnRestoreOriginalDefaults.addEventListener("click", async () => {
+          if (!isAdminLoggedIn) {
+            const entered = prompt("🔐 Nhập mật khẩu Admin để khôi phục dữ liệu gốc:");
+            if (!entered) return;
+            const hashed = await hashPassword(entered, adminSalt);
+            if (hashed !== adminHash && entered !== adminPin) {
+              showToast("❌ Sai mật khẩu Admin!", "error");
+              return;
+            }
+          }
+          if (confirm("Khôi phục lại danh sách 18 website chuẩn ban đầu của trường & Bộ GD&ĐT?")) {
+            linksData = [...DEFAULT_LINKS];
+            categoriesData = [...DEFAULT_CATEGORIES];
+            saveToStorage();
+            saveCategoriesStorage();
+            updateCategoryDropdowns();
+            renderCategoryTabs();
+            renderItems();
+            closeSyncModal();
+            showToast("✅ Đã khôi phục danh sách 18 website chuẩn!");
+          }
+        });
+      }
+
+      if (fileInput) {
+        fileInput.addEventListener("change", (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            try {
+              const parsed = JSON.parse(event.target.result);
+              let importedCount = 0;
+              // Nếu file có chứa categories
+              if (parsed.categories && Array.isArray(parsed.categories) && parsed.categories.length > 0) {
+                categoriesData = parsed.categories;
+                saveCategoriesStorage();
+                updateCategoryDropdowns();
+                renderCategoryTabs();
+              }
+              // Nếu file có chứa links
+              const importedLinks = Array.isArray(parsed) ? parsed : (parsed.links || []);
+              if (importedLinks.length > 0) {
+                linksData = importedLinks;
+                saveToStorage();
+                renderItems();
+                importedCount = importedLinks.length;
+              }
+              if (importedCount > 0) {
+                closeSyncModal();
+                showToast(`🎉 Đã đồng bộ ${importedCount} website & thư mục thành công!`);
+              } else {
+                showToast("File không chứa danh sách hợp lệ", "error");
+              }
+            } catch(err) {
+              showToast("Lỗi định dạng file JSON", "error");
+            } finally {
+              fileInput.value = "";
+            }
+          };
+          reader.readAsText(file);
+        });
+      }
 
       // 13. THEME
       document.getElementById("phoneThemeBtn").addEventListener("click", () => {
@@ -4902,11 +5164,47 @@
       // ==========================================================================
       let deferredInstallPrompt = null;
       let newSwWorker = null;
+      let swRegistration = null;
       const btnInstallPwa = document.getElementById("btnInstallPwa");
       const pwaUpdateBanner = document.getElementById("pwaUpdateBanner");
       const btnApplyUpdate = document.getElementById("btnApplyUpdate");
       const btnCloseUpdateBanner = document.getElementById("btnCloseUpdateBanner");
       const offlineBar = document.getElementById("offlineBar");
+
+      const installedAppModal = document.getElementById("installedAppModal");
+      const closeInstalledAppModalBtn = document.getElementById("closeInstalledAppModalBtn");
+      const btnConfirmInstalledModal = document.getElementById("btnConfirmInstalledModal");
+      const btnCheckAppUpdateNow = document.getElementById("btnCheckAppUpdateNow");
+
+      function openInstalledAppModal() {
+        if (installedAppModal) installedAppModal.classList.add("active");
+      }
+      function closeInstalledAppModal() {
+        if (installedAppModal) installedAppModal.classList.remove("active");
+      }
+
+      if (closeInstalledAppModalBtn) closeInstalledAppModalBtn.addEventListener("click", closeInstalledAppModal);
+      if (btnConfirmInstalledModal) btnConfirmInstalledModal.addEventListener("click", closeInstalledAppModal);
+
+      // Kiểm tra trạng thái đã cài đặt
+      function isAppInstalled() {
+        return window.matchMedia("(display-mode: standalone)").matches || 
+               window.navigator.standalone === true || 
+               document.referrer.includes("android-app://") ||
+               localStorage.getItem("pwa_installed") === "true";
+      }
+
+      function updateInstallButtonUI() {
+        if (isAppInstalled()) {
+          if (btnInstallPwa) {
+            btnInstallPwa.innerHTML = "<span>✓ Đã Cài App</span>";
+            btnInstallPwa.title = "Ứng dụng đã được cài đặt trên thiết bị (Nhấn để xem hướng dẫn/cập nhật)";
+            btnInstallPwa.style.opacity = "0.95";
+          }
+        }
+      }
+
+      updateInstallButtonUI();
 
       // Bắt sự kiện có thể cài đặt App trên Android / Chrome
       window.addEventListener("beforeinstallprompt", (e) => {
@@ -4914,57 +5212,76 @@
         deferredInstallPrompt = e;
         if (btnInstallPwa) {
           btnInstallPwa.style.display = "inline-flex";
+          if (!isAppInstalled()) {
+            btnInstallPwa.innerHTML = "<span>📲 Cài App</span>";
+          }
         }
       });
 
-      // Kiểm tra nếu đang chạy ở chế độ App Standalone đã cài
-      if (window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true) {
-        if (btnInstallPwa) {
-          btnInstallPwa.innerHTML = "<span>✓ Đã Cài App</span>";
-          btnInstallPwa.style.opacity = "0.7";
-        }
-      }
-
+      // Xử lý khi nhấn nút Cài đặt ứng dụng
       if (btnInstallPwa) {
         btnInstallPwa.addEventListener("click", () => {
+          // NẾU ĐÃ CÀI ĐẶT RỒI: Thông báo cho người dùng biết ứng dụng đã cài đặt sẵn sàng!
+          if (isAppInstalled()) {
+            openInstalledAppModal();
+            return;
+          }
+
           if (deferredInstallPrompt) {
             deferredInstallPrompt.prompt();
             deferredInstallPrompt.userChoice.then((choice) => {
               if (choice.outcome === "accepted") {
-                showToast("🎉 Đang cài đặt ứng dụng vào điện thoại...");
-                btnInstallPwa.innerHTML = "<span>✓ Đã Cài App</span>";
+                showToast("🎉 Đang cài đặt ứng dụng vào thiết bị...");
+                localStorage.setItem("pwa_installed", "true");
+                updateInstallButtonUI();
               }
               deferredInstallPrompt = null;
             });
           } else {
-            // Hướng dẫn cài đặt trên iOS hoặc trình duyệt khác
             const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
             if (isIos) {
               alert("CÀI ĐẶT TRÊN IPHONE / IPAD:\n\n1. Chạm vào biểu tượng 'Chia sẻ' (ô vuông có mũi tên hướng lên) ở thanh dưới Safari.\n2. Chọn 'Thêm vào Màn hình chính' (Add to Home Screen).\n3. Bấm 'Thêm' để có biểu tượng app ngoài màn hình!");
             } else {
-              alert("CÀI ĐẶT ỨNG DỤNG:\n\nThầy/Cô bấm vào menu 3 chấm (⋮) của trình duyệt -> chọn 'Cài đặt ứng dụng' hoặc 'Thêm vào màn hình chính' để sử dụng như app thực thụ.");
+              alert("CÀI ĐẶT ỨNG DỤNG:\n\nThầy/Cô bấm vào biểu tượng Cài đặt (mũi tên hoặc dấu cộng) trên thanh địa chỉ trình duyệt, hoặc vào menu 3 chấm (⋮) chọn 'Cài đặt ứng dụng' để sử dụng như phần mềm máy tính.");
             }
           }
         });
       }
 
-      // Đăng ký Service Worker và kiểm tra cập nhật tự động
+      // Đăng ký Service Worker và kiểm tra cập nhật tự động (KHÔNG TỰ TẮT BANNER)
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
           navigator.serviceWorker.register("./sw.js").then((reg) => {
+            swRegistration = reg;
             console.log("[PWA] ServiceWorker đăng ký thành công:", reg.scope);
 
-            // Kiểm tra cập nhật khi đang mở
+            function showUpdateNotice(worker) {
+              newSwWorker = worker;
+              if (pwaUpdateBanner) {
+                pwaUpdateBanner.style.display = "flex"; // Hiện thanh thông báo cố định
+              }
+            }
+
+            // 1. Nếu đã có worker đang chờ (waiting) -> Hiện thông báo ngay
+            if (reg.waiting) {
+              showUpdateNotice(reg.waiting);
+            }
+
+            // 2. Lắng nghe khi có worker mới đang tải cài đặt
             reg.addEventListener("updatefound", () => {
-              newSwWorker = reg.installing;
-              if (newSwWorker) {
-                newSwWorker.addEventListener("statechange", () => {
-                  if (newSwWorker.state === "installed" && navigator.serviceWorker.controller) {
-                    // Đã có phiên bản mới trong nền -> Hiển thị thanh thông báo cập nhật
-                    if (pwaUpdateBanner) pwaUpdateBanner.style.display = "flex";
+              const installingWorker = reg.installing;
+              if (installingWorker) {
+                installingWorker.addEventListener("statechange", () => {
+                  if (installingWorker.state === "installed" && navigator.serviceWorker.controller) {
+                    showUpdateNotice(installingWorker);
                   }
                 });
               }
+            });
+
+            // 3. Tự động kiểm tra cập nhật khi người dùng chuyển lại cửa sổ
+            window.addEventListener("focus", () => {
+              reg.update().catch(() => {});
             });
           }).catch((err) => {
             console.log("[PWA] Đăng ký ServiceWorker thất bại:", err);
@@ -4981,6 +5298,32 @@
         });
       }
 
+      // Nút kiểm tra cập nhật chủ động trong modal
+      if (btnCheckAppUpdateNow) {
+        btnCheckAppUpdateNow.addEventListener("click", () => {
+          if (swRegistration) {
+            btnCheckAppUpdateNow.textContent = "⏳ Đang kiểm tra...";
+            swRegistration.update().then(() => {
+              setTimeout(() => {
+                btnCheckAppUpdateNow.textContent = "🔄 Kiểm Tra Cập Nhật";
+                if (swRegistration.waiting) {
+                  closeInstalledAppModal();
+                  if (pwaUpdateBanner) pwaUpdateBanner.style.display = "flex";
+                  showToast("🎉 Đã có bản cập nhật mới! Mời Thầy/Cô bấm Cập Nhật.");
+                } else {
+                  showToast("✅ Ứng dụng đang ở phiên bản mới nhất!");
+                }
+              }, 800);
+            }).catch(() => {
+              btnCheckAppUpdateNow.textContent = "🔄 Kiểm Tra Cập Nhật";
+              showToast("✅ Đang ở phiên bản mới nhất!");
+            });
+          } else {
+            showToast("✅ Đang ở phiên bản mới nhất!");
+          }
+        });
+      }
+
       // KÍCH HOẠT NÂNG CẤP VỚI HIỆU ỨNG LOADING CHUYÊN NGHIỆP & TỰ ĐỘNG VỀ TRANG CHỦ
       function executeAppUpdate() {
         const overlay = document.getElementById("updateLoadingOverlay");
@@ -4992,6 +5335,8 @@
         setTimeout(() => {
           if (newSwWorker) {
             newSwWorker.postMessage({ action: "skipWaiting" });
+          } else if (swRegistration && swRegistration.waiting) {
+            swRegistration.waiting.postMessage({ action: "skipWaiting" });
           } else if (navigator.serviceWorker && navigator.serviceWorker.controller) {
             navigator.serviceWorker.controller.postMessage({ action: "skipWaiting" });
           } else {
