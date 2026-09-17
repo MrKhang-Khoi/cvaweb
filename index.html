@@ -1659,6 +1659,137 @@
       color: #ffffff !important;
     }
 
+
+    /* ==========================================================================
+       PWA UPDATE LOADING OVERLAY (HIỆU ỨNG NÂNG CẤP PHIÊN BẢN MỚI)
+       ========================================================================== */
+    .update-loading-overlay {
+      z-index: 99999 !important;
+      background: rgba(15, 23, 42, 0.88) !important;
+      backdrop-filter: blur(14px) !important;
+      -webkit-backdrop-filter: blur(14px) !important;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      position: fixed;
+      inset: 0;
+    }
+    .update-loading-overlay.active {
+      display: flex !important;
+    }
+    .update-loading-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-lg);
+      padding: 32px 24px;
+      max-width: 440px;
+      width: calc(100% - 32px);
+      text-align: center;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+      animation: popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .update-pulse-ring {
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      background: rgba(37, 99, 235, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px auto;
+      animation: pulseGlow 1.8s infinite ease-in-out;
+    }
+    .update-icon-box svg {
+      animation: spinUpdate 2s linear infinite;
+    }
+    @keyframes spinUpdate {
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
+      50% { transform: scale(1.06); box-shadow: 0 0 0 14px rgba(37, 99, 235, 0); }
+    }
+    .update-title {
+      font-size: 1.18rem;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-bottom: 8px;
+    }
+    .update-desc {
+      font-size: 0.85rem;
+      color: var(--text-mute);
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+    .update-progress-bar {
+      width: 100%;
+      height: 6px;
+      background: var(--card-border);
+      border-radius: 99px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .update-progress-fill {
+      height: 100%;
+      width: 40%;
+      background: linear-gradient(90deg, #2563eb, #3b82f6, #60a5fa);
+      border-radius: 99px;
+      animation: progressIndeterminate 1.4s infinite ease-in-out;
+    }
+    @keyframes progressIndeterminate {
+      0% { transform: translateX(-100%) scaleX(0.4); }
+      50% { transform: translateX(50%) scaleX(0.8); }
+      100% { transform: translateX(250%) scaleX(0.4); }
+    }
+    .update-status-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--primary);
+      background: var(--primary-light);
+      padding: 6px 14px;
+      border-radius: 99px;
+    }
+    .update-spinner-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--primary);
+      animation: pulseGlow 1s infinite;
+    }
+
+    /* NÚT DI CHUYỂN THỨ TỰ MỤC (LÊN / XUỐNG) */
+    .move-cat-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-sub);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .move-cat-btn:hover:not(:disabled) {
+      background: var(--primary-light);
+      border-color: var(--primary);
+      color: var(--primary);
+      transform: translateY(-1px);
+    }
+    .move-cat-btn:active:not(:disabled) {
+      transform: scale(0.92);
+    }
+    .move-cat-btn:disabled {
+      opacity: 0.22;
+      cursor: not-allowed;
+      border-color: transparent;
+    }
+
   </style>
 </head>
 <body>
@@ -2207,6 +2338,11 @@
             </div>
 
             <div class="f-group">
+              <label class="f-label" for="qrHeaderLine">Tiêu đề ở đỉnh thẻ (Ví dụ: Tên Trường / Đơn Vị)</label>
+              <input type="text" id="qrHeaderLine" class="f-input" value="TRƯỜNG THCS CHU VĂN AN" placeholder="Ví dụ: TRƯỜNG THCS CHU VĂN AN...">
+            </div>
+
+            <div class="f-group">
               <label class="f-label" for="qrBrandLine1">Dòng chữ phụ 1 (Dưới mã QR)</label>
               <input type="text" id="qrBrandLine1" class="f-input" value="Hệ thống" placeholder="Ví dụ: Hệ thống, Cổng Thông Tin...">
             </div>
@@ -2437,6 +2573,31 @@
           <button type="submit" class="btn-action btn-action-primary">Lưu Thay Đổi</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  
+  <!-- OVERLAY LOADING KHI CẬP NHẬT PHIÊN BẢN MỚI -->
+  <div class="sheet-overlay update-loading-overlay" id="updateLoadingOverlay">
+    <div class="update-loading-card">
+      <div class="update-pulse-ring">
+        <div class="update-icon-box">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.3">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+          </svg>
+        </div>
+      </div>
+      <h3 class="update-title">Đang Nâng Cấp Phiên Bản Mới...</h3>
+      <p class="update-desc">Hệ thống đang đồng bộ dữ liệu giao diện và làm mới bộ nhớ đệm cache. Vui lòng chờ trong giây lát...</p>
+      
+      <div class="update-progress-bar">
+        <div class="update-progress-fill"></div>
+      </div>
+
+      <div class="update-status-tag">
+        <span class="update-spinner-dot"></span>
+        <span>Tự động chuyển về Trang Chủ khi hoàn tất</span>
+      </div>
     </div>
   </div>
 
@@ -2758,6 +2919,11 @@
           const saved = localStorage.getItem("teacher_hub_links_v2");
           if (saved) {
             linksData = JSON.parse(saved);
+            // BẢO VỆ DỮ LIỆU: Đảm bảo không bao giờ bị rỗng 0 trang web
+            if (!Array.isArray(linksData) || linksData.length === 0) {
+              linksData = [...DEFAULT_LINKS];
+              saveToStorage();
+            }
           } else {
             linksData = [...DEFAULT_LINKS];
             saveToStorage();
@@ -4157,34 +4323,62 @@
         ctx.closePath();
       }
 
-      // VẼ MÃ QR THƯƠNG HIỆU CHUẨN H2
+      // VẼ MÃ QR THƯƠNG HIỆU CHUẨN H2 KHOA HỌC & ĐẲNG CẤP
       function renderQrCanvas() {
         if (!qrCanvas) return;
         const ctx = qrCanvas.getContext("2d");
         const W = 800;
-        const H = 1000;
+        const H = 1040; // Mở rộng chiều cao đạt tỷ lệ vàng in ấn
         qrCanvas.width = W;
         qrCanvas.height = H;
 
         let targetUrl = qrCustomUrl.value.trim() || "https://moet.gov.vn";
-        if (!/^https?:\/\//i.test(targetUrl)) targetUrl = "https://" + targetUrl;
+        if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) targetUrl = "https://" + targetUrl;
 
-        // 1. Nền trắng
+        // 1. Nền trắng tinh khiết
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, W, H);
 
-        // 2. Thẻ viền ngoài bo tròn góc chuẩn H2
-        const cardPad = 24;
+        // 2. Thẻ viền ngoài bo tròn góc chuẩn Standee
+        const cardPad = 22;
         const cardW = W - cardPad * 2;
         const cardH = H - cardPad * 2;
         ctx.save();
-        roundRect(ctx, cardPad, cardPad, cardW, cardH, 40);
+        roundRect(ctx, cardPad, cardPad, cardW, cardH, 36);
         ctx.strokeStyle = "#cbd5e1";
         ctx.lineWidth = 3;
         ctx.stroke();
         ctx.restore();
 
-        // 3. Tạo Ma trận QR với Mức sửa lỗi H (30%)
+        // 3. Tiêu đề Đơn Vị / Trường Học ở đỉnh thẻ (Cân đối tỷ lệ vàng)
+        const headerInput = document.getElementById("qrHeaderLine");
+        const headerText = (headerInput && headerInput.value.trim()) || "TRƯỜNG THCS CHU VĂN AN";
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#64748b";
+        ctx.font = "800 21px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        ctx.letterSpacing = "2px";
+        ctx.fillText(headerText.toUpperCase(), W / 2, 68);
+
+        // Đường chỉ trang trí hai bên tiêu đề
+        ctx.strokeStyle = "#e2e8f0";
+        ctx.lineWidth = 2;
+        const textWidth = ctx.measureText(headerText.toUpperCase()).width;
+        const lineLen = Math.max(30, (W - textWidth - 140) / 2);
+        if (lineLen > 20) {
+          ctx.beginPath();
+          ctx.moveTo(W / 2 - textWidth / 2 - 20, 61);
+          ctx.lineTo(W / 2 - textWidth / 2 - 20 - lineLen, 61);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(W / 2 + textWidth / 2 + 20, 61);
+          ctx.lineTo(W / 2 + textWidth / 2 + 20 + lineLen, 61);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        // 4. Tạo Ma trận QR với Mức sửa lỗi H (30%)
         let qr;
         try {
           qr = window.qrcode(0, 'H');
@@ -4197,14 +4391,14 @@
         }
 
         const count = qr.getModuleCount();
-        const qrSize = 620;
+        const qrSize = 600;
         const qrX = (W - qrSize) / 2;
-        const qrY = 64;
+        const qrY = 94; // Tọa độ QR cân bằng hoàn hảo giữa Header và Footer
         const modSize = qrSize / count;
 
         const centerX = qrX + qrSize / 2;
         const centerY = qrY + qrSize / 2;
-        const centerRadius = qrSize * 0.22; // ~136px
+        const centerRadius = qrSize * 0.21; // ~126px
 
         function isFinder(r, c) {
           if (r < 7 && c < 7) return true;
@@ -4223,12 +4417,12 @@
             const mx = qrX + c * modSize + modSize / 2;
             const my = qrY + r * modSize + modSize / 2;
 
-            // Bỏ qua tâm tròn dành cho Logo
+            // Bỏ qua tâm tròn dành cho Logo (khoảng cách an toàn lớn hơn để chống lóa)
             const dist = Math.hypot(mx - centerX, my - centerY);
-            if (dist < centerRadius + 6) continue;
+            if (dist < centerRadius + 9) continue;
 
             ctx.beginPath();
-            ctx.arc(mx, my, modSize * 0.42, 0, Math.PI * 2);
+            ctx.arc(mx, my, modSize * 0.43, 0, Math.PI * 2);
             ctx.fill();
           }
         }
@@ -4237,17 +4431,14 @@
         function drawFinderEye(sx, sy) {
           const s = 7 * modSize;
           ctx.save();
-          // Vành ngoài bo tròn
           ctx.fillStyle = qrState.color;
           roundRect(ctx, sx, sy, s, s, modSize * 1.6);
           ctx.fill();
 
-          // Vành trắng giữa
           ctx.fillStyle = "#ffffff";
           roundRect(ctx, sx + modSize, sy + modSize, s - 2 * modSize, s - 2 * modSize, modSize * 1.1);
           ctx.fill();
 
-          // Nhân vuông trong cùng
           ctx.fillStyle = qrState.color;
           roundRect(ctx, sx + 2 * modSize, sy + 2 * modSize, s - 4 * modSize, s - 4 * modSize, modSize * 0.9);
           ctx.fill();
@@ -4258,19 +4449,24 @@
         drawFinderEye(qrX + (count - 7) * modSize, qrY); // Top-Right
         drawFinderEye(qrX, qrY + (count - 7) * modSize); // Bottom-Left
 
-        // 4. Tâm tròn Huy Hiệu Thương Hiệu
+        // 5. Vòng Cách Ly Kép Bảo Vệ Con Dấu (Double Clean Ring - Tăng độ nhận diện camera)
         ctx.save();
-        // Vòng trắng cách ly
         ctx.beginPath();
-        ctx.arc(centerX, centerY, centerRadius + 4, 0, Math.PI * 2);
+        ctx.arc(centerX, centerY, centerRadius + 6, 0, Math.PI * 2);
         ctx.fillStyle = "#ffffff";
         ctx.fill();
         ctx.lineWidth = 3;
         ctx.strokeStyle = "#e2e8f0";
         ctx.stroke();
 
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, centerRadius + 1, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(0,0,0,0.06)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
         // Cắt clip hình tròn
-        const emblemR = centerRadius - 6;
+        const emblemR = centerRadius - 4;
         ctx.beginPath();
         ctx.arc(centerX, centerY, emblemR, 0, Math.PI * 2);
         ctx.clip();
@@ -4281,7 +4477,6 @@
           // Huy hiệu Bộ Giáo Dục
           ctx.fillStyle = "#1e3a8a";
           ctx.fillRect(centerX - emblemR, centerY - emblemR, emblemR * 2, emblemR * 2);
-          // Vẽ ngôi sao vàng & quyển sách
           ctx.fillStyle = "#fbbf24";
           draw5Star(ctx, centerX, centerY - 28, 5, 34, 15);
           ctx.fill();
@@ -4298,7 +4493,7 @@
           draw5Star(ctx, centerX, centerY, 5, 56, 24);
           ctx.fill();
         } else {
-          // Chuẩn H2: Tuyên Giáo (Nền Navy Đậm + Sao Vàng + Text Tuyên Giáo)
+          // Chuẩn H2: Tuyên Giáo
           ctx.fillStyle = "#1e293b";
           ctx.fillRect(centerX - emblemR, centerY - emblemR, emblemR * 2, emblemR * 2);
 
@@ -4313,18 +4508,23 @@
         }
         ctx.restore();
 
-        // 5. Hai Dòng Chữ Thương Hiệu Phía Dưới
+        // 6. Chữ Thương Hiệu & Chỉ Dẫn Quét Mã (Call-to-Action)
         ctx.textAlign = "center";
 
         // Dòng 1: Chữ phụ
-        ctx.fillStyle = "#475569";
-        ctx.font = "500 30px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-        ctx.fillText(qrBrandLine1.value.trim() || "Hệ thống", W / 2, 856);
+        ctx.fillStyle = "#64748b";
+        ctx.font = "600 28px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        ctx.fillText(qrBrandLine1.value.trim() || "ỨNG DỤNG", W / 2, 868);
 
         // Dòng 2: Thương hiệu chính (In hoa đậm nét)
         ctx.fillStyle = qrState.color === "#dc2626" ? "#b91c1c" : qrState.color;
-        ctx.font = "800 38px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-        ctx.fillText((qrBrandLine2.value.trim() || "THÔNG TIN TUYÊN GIÁO").toUpperCase(), W / 2, 916);
+        ctx.font = "800 36px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        ctx.fillText((qrBrandLine2.value.trim() || "QUẢN LÝ WEBSITE DẠY HỌC").toUpperCase(), W / 2, 920);
+
+        // Dòng 3: Chỉ dẫn quét mã QR khoa học (Call To Action)
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "500 20px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        ctx.fillText("📷 Dùng Camera hoặc Zalo để quét truy cập nhanh", W / 2, 972);
       }
 
       // TẢI ẢNH PNG
@@ -4453,9 +4653,11 @@
         const validCats = categoriesData.filter(c => c.id !== "all" && c.id !== "fav");
         if (catCountLabel) catCountLabel.textContent = validCats.length;
 
-        catManagerList.innerHTML = validCats.map(cat => {
+        catManagerList.innerHTML = validCats.map((cat, idx) => {
           const count = linksData.filter(l => l.category === cat.id).length;
           const isSystem = !!cat.system || cat.id === "tienich";
+          const isFirst = (idx === 0);
+          const isLast = (idx === validCats.length - 1);
 
           return `
             <div class="cat-item-row" data-id="${cat.id}">
@@ -4469,14 +4671,24 @@
                 </div>
               </div>
               <div class="cat-item-actions">
-                <button type="button" class="icon-btn edit-cat-btn" data-id="${cat.id}" title="Đổi tên & biểu tượng" style="width:36px; height:36px;">
+                <button type="button" class="move-cat-btn move-cat-up-btn" data-id="${cat.id}" title="Di chuyển lên trên" ${isFirst ? 'disabled' : ''}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="18 15 12 9 6 15"></polyline>
+                  </svg>
+                </button>
+                <button type="button" class="move-cat-btn move-cat-down-btn" data-id="${cat.id}" title="Di chuyển xuống dưới" ${isLast ? 'disabled' : ''}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+                <button type="button" class="icon-btn edit-cat-btn" data-id="${cat.id}" title="Đổi tên & biểu tượng" style="width:34px; height:34px;">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 20h9"></path>
                     <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
                   </svg>
                 </button>
                 ${!isSystem ? `
-                  <button type="button" class="icon-btn del-cat-btn" data-id="${cat.id}" title="Xóa mục này" style="width:36px; height:36px; color:var(--danger);">
+                  <button type="button" class="icon-btn del-cat-btn" data-id="${cat.id}" title="Xóa mục này" style="width:34px; height:34px; color:var(--danger);">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <polyline points="3 6 5 6 21 6"></polyline>
                       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -4487,6 +4699,14 @@
             </div>
           `;
         }).join("");
+
+        catManagerList.querySelectorAll(".move-cat-up-btn:not([disabled])").forEach(btn => {
+          btn.addEventListener("click", () => moveCategory(btn.dataset.id, "up"));
+        });
+
+        catManagerList.querySelectorAll(".move-cat-down-btn:not([disabled])").forEach(btn => {
+          btn.addEventListener("click", () => moveCategory(btn.dataset.id, "down"));
+        });
 
         catManagerList.querySelectorAll(".edit-cat-btn").forEach(btn => {
           btn.addEventListener("click", () => openEditCategory(btn.dataset.id));
@@ -4526,6 +4746,36 @@
           updateCategoryDropdowns();
           showToast(`Đã thêm mục "${label}" thành công!`);
         });
+      }
+
+      
+      // DI CHUYỂN THỨ TỰ CÁC MỤC (LÊN / XUỐNG)
+      function moveCategory(catId, direction) {
+        const idx = categoriesData.findIndex(c => c.id === catId);
+        if (idx === -1) return;
+
+        const validCats = categoriesData.filter(c => c.id !== "all" && c.id !== "fav");
+        const validIdx = validCats.findIndex(c => c.id === catId);
+        if (validIdx === -1) return;
+
+        const targetValidIdx = direction === "up" ? validIdx - 1 : validIdx + 1;
+        if (targetValidIdx < 0 || targetValidIdx >= validCats.length) return;
+
+        const targetCat = validCats[targetValidIdx];
+        const targetIdx = categoriesData.findIndex(c => c.id === targetCat.id);
+        if (targetIdx === -1) return;
+
+        // Hoán đổi vị trí
+        const temp = categoriesData[idx];
+        categoriesData[idx] = categoriesData[targetIdx];
+        categoriesData[targetIdx] = temp;
+
+        saveCategoriesStorage();
+        renderCategoryManagerList();
+        renderCategoryTabs();
+        updateCategoryDropdowns();
+        renderItems();
+        showToast(`Đã chuyển mục "${temp.label}" ${direction === 'up' ? 'lên trên' : 'xuống dưới'}!`);
       }
 
       // SỬA TÊN VÀ BIỂU TƯỢNG MỤC
@@ -4628,6 +4878,7 @@
       window.teacherPortal.openCategoryModal = openCategoryModal;
       window.teacherPortal.openEditCategory = openEditCategory;
       window.teacherPortal.deleteCategory = deleteCategory;
+      window.teacherPortal.moveCategory = moveCategory;
       window.teacherPortal.isAdmin = () => isAdminLoggedIn;
       window.teacherPortal.getLinks = () => linksData;
       window.teacherPortal.addLink = (link) => {
@@ -4730,17 +4981,27 @@
         });
       }
 
-      // Nhấn Cập Nhật Ngay: Kích hoạt skipWaiting() và làm mới mượt mà
-      if (btnApplyUpdate) {
-        btnApplyUpdate.addEventListener("click", () => {
+      // KÍCH HOẠT NÂNG CẤP VỚI HIỆU ỨNG LOADING CHUYÊN NGHIỆP & TỰ ĐỘNG VỀ TRANG CHỦ
+      function executeAppUpdate() {
+        const overlay = document.getElementById("updateLoadingOverlay");
+        if (overlay) overlay.classList.add("active");
+
+        // Đánh dấu để khi reload hoàn tất, hệ thống tự động đưa về Trang Chủ
+        sessionStorage.setItem("pwa_just_updated", "true");
+
+        setTimeout(() => {
           if (newSwWorker) {
             newSwWorker.postMessage({ action: "skipWaiting" });
-          } else if (navigator.serviceWorker.controller) {
+          } else if (navigator.serviceWorker && navigator.serviceWorker.controller) {
             navigator.serviceWorker.controller.postMessage({ action: "skipWaiting" });
           } else {
             window.location.reload();
           }
-        });
+        }, 500);
+      }
+
+      if (btnApplyUpdate) {
+        btnApplyUpdate.addEventListener("click", executeAppUpdate);
       }
 
       if (btnCloseUpdateBanner) {
@@ -5023,6 +5284,20 @@
       };
 
       initReminders();
+
+      // KIỂM TRA SAU KHI NÂNG CẤP XONG: TỰ ĐỘNG ĐƯA VỀ TRANG CHỦ & BÁO THÀNH CÔNG
+      if (sessionStorage.getItem("pwa_just_updated") === "true") {
+        sessionStorage.removeItem("pwa_just_updated");
+        currentCategory = "all";
+        searchQuery = "";
+        const sInput = document.getElementById("searchInput");
+        if (sInput) sInput.value = "";
+        renderCategoryTabs();
+        syncBottomDock();
+        renderItems();
+        showToast("🎉 Cập nhật phiên bản mới thành công! Chào mừng trở lại Trang Chủ.");
+      }
+
 
       setView(viewMode);
       renderCategoryTabs();
