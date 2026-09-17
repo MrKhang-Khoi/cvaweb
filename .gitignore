@@ -1,0 +1,11 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Codegraph
+.codegraph/
+
+# Temporary / Scratch
+scratch/
+node_modules/
+*.log
