@@ -1502,6 +1502,111 @@
       color: #15803d;
     }
 
+
+    /* ==========================================================================
+       CATEGORY MANAGEMENT (QUẢN LÝ CÁC MỤC CHÍNH)
+       ========================================================================== */
+    .cat-manager-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+      max-height: 48vh;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .cat-item-row {
+      background: var(--bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .cat-item-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .cat-item-icon-box {
+      font-size: 1.3rem;
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-sm);
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .cat-item-label {
+      font-weight: 800;
+      font-size: 0.94rem;
+      color: var(--text-main);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .cat-item-meta {
+      font-size: 0.74rem;
+      color: var(--text-mute);
+    }
+
+    .cat-item-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .emoji-suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .emoji-chip {
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      border: 1px solid var(--card-border);
+      font-size: 1.15rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.1s ease, border-color 0.1s ease;
+    }
+
+    .emoji-chip:hover, .emoji-chip:active {
+      transform: scale(1.15);
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .cat-pill-admin-manage {
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(99, 102, 241, 0.25)) !important;
+      border: 1.5px dashed var(--primary) !important;
+      color: var(--primary) !important;
+      font-weight: 800 !important;
+      cursor: pointer;
+    }
+    .cat-pill-admin-manage:hover {
+      background: var(--primary) !important;
+      color: #ffffff !important;
+    }
+
   </style>
 </head>
 <body>
@@ -1650,6 +1755,13 @@
         <span>Đang mở quyền Sửa, Thêm, Xóa</span>
       </div>
       <div class="admin-banner-actions">
+        <button class="btn-add-shortcut" id="btnBannerManageCat" title="Quản lý, đổi tên, thêm, xóa các mục chính">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          Mục Chính
+        </button>
         <button class="btn-add-shortcut" id="btnAddWeb" title="Thêm website mới">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -2173,6 +2285,110 @@
     </div>
   </div>
 
+  
+  <!-- MODAL QUẢN LÝ CÁC MỤC CHÍNH (DÀNH CHO ADMIN) -->
+  <div class="sheet-overlay" id="categoryModal">
+    <div class="sheet-panel" style="max-width: 520px;">
+      <div class="sheet-head">
+        <h3 class="sheet-title">⚙️ Quản Lý Các Mục Chính</h3>
+        <button id="closeCategoryModal" class="icon-btn" style="border:none; box-shadow:none;" title="Đóng">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="sheet-body">
+        <div class="vault-safe-banner" style="background: rgba(79, 70, 229, 0.08); border-color: rgba(79, 70, 229, 0.3);">
+          <span style="font-size: 1.1rem;">💡</span>
+          <div>
+            <strong>Đặc quyền Admin:</strong> Thầy/Cô có thể Đổi tên, Thay biểu tượng, Thêm mục mới hoặc Xóa các mục không dùng. Mọi thay đổi sẽ cập nhật tức thì lên thanh trượt danh mục.
+          </div>
+        </div>
+
+        <!-- FORM THÊM MỤC MỚI -->
+        <form id="categoryAddForm" style="background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius-md); padding: 12px; margin-bottom: 14px;">
+          <div style="font-weight: 800; font-size: 0.88rem; margin-bottom: 8px; color: var(--text-main);">
+            + Thêm Mục Mới
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" id="newCatIcon" class="f-input" value="📁" style="width: 58px; text-align: center; font-size: 1.25rem;" maxlength="4" title="Biểu tượng Emoji" required>
+            <input type="text" id="newCatLabel" class="f-input" placeholder="Nhập tên mục (ví dụ: Tổ Chuyên Môn, Công Tác Đội...)" style="flex: 1;" required>
+            <button type="submit" class="btn-action btn-action-primary" style="height: 44px; padding: 0 14px; white-space: nowrap;">
+              + Thêm
+            </button>
+          </div>
+          <div class="emoji-suggestions" id="emojiSuggestions">
+            <button type="button" class="emoji-chip" data-emoji="📁">📁</button>
+            <button type="button" class="emoji-chip" data-emoji="📊">📊</button>
+            <button type="button" class="emoji-chip" data-emoji="🏫">🏫</button>
+            <button type="button" class="emoji-chip" data-emoji="📚">📚</button>
+            <button type="button" class="emoji-chip" data-emoji="🤖">🤖</button>
+            <button type="button" class="emoji-chip" data-emoji="🛠️">🛠️</button>
+            <button type="button" class="emoji-chip" data-emoji="📝">📝</button>
+            <button type="button" class="emoji-chip" data-emoji="🎯">🎯</button>
+            <button type="button" class="emoji-chip" data-emoji="👥">👥</button>
+            <button type="button" class="emoji-chip" data-emoji="🏆">🏆</button>
+            <button type="button" class="emoji-chip" data-emoji="🔬">🔬</button>
+            <button type="button" class="emoji-chip" data-emoji="🎨">🎨</button>
+            <button type="button" class="emoji-chip" data-emoji="💻">💻</button>
+            <button type="button" class="emoji-chip" data-emoji="⏰">⏰</button>
+          </div>
+        </form>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+          <span style="font-weight: 800; font-size: 0.88rem; color: var(--text-sub);">
+            Danh Sách Các Mục (<span id="catCountLabel">0</span>)
+          </span>
+          <button type="button" id="btnResetCategories" class="btn-sheet-addon" style="font-size: 0.76rem; height: 32px; padding: 0 8px;" title="Khôi phục danh sách mục chuẩn ban đầu">
+            ↺ Mặc định
+          </button>
+        </div>
+
+        <div id="catManagerList" class="cat-manager-list">
+          <!-- Render qua JS -->
+        </div>
+      </div>
+
+      <div class="sheet-foot">
+        <button type="button" id="btnFinishCategoryModal" class="btn-action btn-action-primary" style="width: 100%;">Hoàn Tất</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- POPUP SỬA TÊN & BIỂU TƯỢNG MỤC -->
+  <div class="sheet-overlay" id="editCategoryModal">
+    <div class="sheet-panel" style="max-width: 420px;">
+      <div class="sheet-head">
+        <h3 class="sheet-title">✏️ Đổi Tên & Biểu Tượng Mục</h3>
+        <button id="closeEditCategoryModalBtn" class="icon-btn" style="border:none; box-shadow:none;" title="Đóng">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <form id="editCategoryForm">
+        <input type="hidden" id="editCatId">
+        <div class="sheet-body">
+          <div class="f-group">
+            <label class="f-label" for="editCatIcon">Biểu tượng Emoji</label>
+            <input type="text" id="editCatIcon" class="f-input" style="width: 70px; text-align: center; font-size: 1.4rem;" maxlength="4" required>
+          </div>
+          <div class="f-group">
+            <label class="f-label" for="editCatLabel">Tên hiển thị của mục *</label>
+            <input type="text" id="editCatLabel" class="f-input" required>
+          </div>
+        </div>
+        <div class="sheet-foot">
+          <button type="button" id="btnCancelEditCat" class="btn-action btn-action-cancel">Hủy</button>
+          <button type="submit" class="btn-action btn-action-primary">Lưu Thay Đổi</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="toast-box" id="toastBox"></div>
 
   <!-- ==========================================================================
@@ -2340,15 +2556,17 @@
         }
       ];
 
-      const CATEGORIES = [
-        { id: "all", label: "Tất cả", icon: "🌐" },
-        { id: "fav", label: "Yêu thích ⭐", icon: "⭐" },
+      const DEFAULT_CATEGORIES = [
+        { id: "all", label: "Tất cả", icon: "🌐", system: true },
+        { id: "fav", label: "Yêu thích ⭐", icon: "⭐", system: true },
         { id: "diem", label: "Sổ điểm", icon: "📊" },
         { id: "csdl", label: "CSDL Ngành", icon: "🏫" },
         { id: "hoclieu", label: "Học liệu", icon: "📚" },
         { id: "ai", label: "AI & Đổi mới", icon: "🤖" },
-        { id: "tienich", label: "Tiện ích", icon: "🛠️" }
+        { id: "tienich", label: "Tiện ích", icon: "🛠️", system: true }
       ];
+
+      let categoriesData = [...DEFAULT_CATEGORIES];
 
       const COLOR_PALETTE = [
         "#2563eb", "#4f46e5", "#7c3aed", "#db2777", 
@@ -2356,9 +2574,7 @@
         "#0891b2", "#475569"
       ];
 
-      // 2. STATE & ADMIN SECURITY
-      const DEFAULT_ADMIN_PIN = "1234";
-      let adminPin = DEFAULT_ADMIN_PIN;
+      // 2. STATE & ADMIN SECURITY (MÃ HÓA CHUẨN SALTED SHA-256)
       let isAdminLoggedIn = false;
       let linksData = [];
       let currentCategory = "all";
@@ -2367,17 +2583,128 @@
       let viewMode = "list"; // 'list' | 'grid'
       let currentTheme = "light";
 
-      // 3. STORAGE
+      // BẢO MẬT MẬT MÃ HỌC: HÀM BĂM CHUẨN NIST SHA-256 VỚI SALT NGẪU NHIÊN
+      function rightRotate(v, a) { return (v>>>a) | (v<<(32 - a)); }
+      function jsSha256(ascii) {
+        var mathPow = Math.pow; var maxWord = mathPow(2, 32); var i, j; var result = ''; var words = [];
+        var asciiBitLength = ascii.length*8; var hash = []; var k = []; var primeCounter = 0; var isComp = {};
+        for (var c = 2; primeCounter < 64; c++) {
+          if (!isComp[c]) {
+            for (i = 0; i < 313; i += c) isComp[i] = c;
+            hash[primeCounter] = (mathPow(c, .5)*maxWord)|0;
+            k[primeCounter++] = (mathPow(c, 1/3)*maxWord)|0;
+          }
+        }
+        ascii += '\x80';
+        while (ascii.length%64 - 56) ascii += '\x00';
+        for (i = 0; i < ascii.length; i++) {
+          j = ascii.charCodeAt(i);
+          words[i>>2] |= j << ((3 - i)%4)*8;
+        }
+        words[words.length] = ((asciiBitLength/maxWord)|0);
+        words[words.length] = (asciiBitLength);
+        for (j = 0; j < words.length;) {
+          var w = words.slice(j, j += 16); var oldHash = hash; hash = hash.slice(0, 8);
+          for (i = 0; i < 64; i++) {
+            var w15 = w[i - 15], w2 = w[i - 2]; var a = hash[0], e = hash[4];
+            var temp1 = hash[7] + (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25)) + ((e & hash[5]) ^ ((~e) & hash[6])) + k[i] + (w[i] = (i < 16) ? w[i] : (w[i - 16] + (rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15>>>3)) + w[i - 7] + (rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2>>>10)))|0);
+            var temp2 = (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22)) + ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
+            hash = [(temp1 + temp2)|0].concat(hash);
+            hash[4] = (hash[4] + temp1)|0;
+          }
+          for (i = 0; i < 8; i++) hash[i] = (hash[i] + oldHash[i])|0;
+        }
+        for (i = 0; i < 8; i++) {
+          for (j = 3; j >= 0; j--) {
+            var b = (hash[i]>>(j*8))&255;
+            result += (b < 16 ? '0' : '') + b.toString(16);
+          }
+        }
+        return result;
+      }
+
+      async function hashPassword(pin, salt) {
+        const text = salt + "::" + pin;
+        if (window.crypto && window.crypto.subtle) {
+          try {
+            const enc = new TextEncoder();
+            const buf = await window.crypto.subtle.digest("SHA-256", enc.encode(text));
+            return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+          } catch {
+            return jsSha256(text);
+          }
+        }
+        return jsSha256(text);
+      }
+
+      function generateSalt() {
+        const arr = new Uint8Array(16);
+        if (window.crypto && window.crypto.getRandomValues) {
+          window.crypto.getRandomValues(arr);
+        } else {
+          for (let i = 0; i < 16; i++) arr[i] = Math.floor(Math.random() * 256);
+        }
+        return Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
+      }
+
+      // 3. STORAGE & CATEGORIES
       let vaultData = {};
 
-      function initStorage() {
+      async function checkAndMigrateAdminPin() {
+        const oldPlainPin = localStorage.getItem("teacher_hub_admin_pin");
+        const currentHash = localStorage.getItem("teacher_hub_admin_hash");
+        const currentSalt = localStorage.getItem("teacher_hub_admin_salt");
+
+        if (oldPlainPin) {
+          // Nâng cấp mật khẩu cũ sang chuẩn SHA-256 + Salt
+          const salt = generateSalt();
+          const hash = await hashPassword(oldPlainPin, salt);
+          localStorage.setItem("teacher_hub_admin_salt", salt);
+          localStorage.setItem("teacher_hub_admin_hash", hash);
+          localStorage.removeItem("teacher_hub_admin_pin"); // XÓA VĨNH VIỄN VĂN BẢN THÔ!
+          console.log("[Bảo Mật] Đã nâng cấp mật khẩu Admin sang chuẩn mã hóa Salted SHA-256 an toàn.");
+        } else if (!currentHash || !currentSalt) {
+          // Khởi tạo mật khẩu ban đầu "1234" dưới dạng Salted SHA-256
+          const salt = generateSalt();
+          const hash = await hashPassword("1234", salt);
+          localStorage.setItem("teacher_hub_admin_salt", salt);
+          localStorage.setItem("teacher_hub_admin_hash", hash);
+        }
+      }
+
+      function saveCategoriesStorage() {
         try {
-          const savedPin = localStorage.getItem("teacher_hub_admin_pin");
-          if (savedPin) {
-            adminPin = savedPin;
+          localStorage.setItem("teacher_hub_categories_v1", JSON.stringify(categoriesData));
+        } catch(e) {
+          showToast("Không thể lưu danh mục", "error");
+        }
+      }
+
+      function updateCategoryDropdowns() {
+        const sel = document.getElementById("sheetCategory");
+        if (!sel) return;
+        const currentVal = sel.value;
+        const validCats = categoriesData.filter(c => c.id !== "all" && c.id !== "fav");
+        sel.innerHTML = validCats.map(c => `<option value="${c.id}">${c.icon} ${escapeHtml(c.label)}</option>`).join("");
+        if (currentVal && validCats.some(c => c.id === currentVal)) {
+          sel.value = currentVal;
+        } else if (validCats.length > 0) {
+          sel.value = validCats[0].id;
+        }
+      }
+
+      async function initStorage() {
+        try {
+          // Tự động chuyển đổi mật khẩu sang chuẩn Salted SHA-256 & xóa bỏ văn bản thô
+          await checkAndMigrateAdminPin();
+
+          // Nạp danh mục động
+          const savedCats = localStorage.getItem("teacher_hub_categories_v1");
+          if (savedCats) {
+            categoriesData = JSON.parse(savedCats);
           } else {
-            adminPin = DEFAULT_ADMIN_PIN;
-            localStorage.setItem("teacher_hub_admin_pin", DEFAULT_ADMIN_PIN);
+            categoriesData = [...DEFAULT_CATEGORIES];
+            saveCategoriesStorage();
           }
 
           const saved = localStorage.getItem("teacher_hub_links_v2");
@@ -2396,6 +2723,7 @@
           }
         } catch (e) {
           linksData = [...DEFAULT_LINKS];
+          categoriesData = [...DEFAULT_CATEGORIES];
           vaultData = {};
         }
 
@@ -2410,6 +2738,8 @@
         } else {
           applyTheme("light");
         }
+
+        updateCategoryDropdowns();
       }
 
       function saveToStorage() {
@@ -2451,17 +2781,28 @@
         const track = document.getElementById("catScrollTrack");
         if (!track) return;
 
-        track.innerHTML = CATEGORIES.map(cat => {
+        let pillsHtml = categoriesData.map(cat => {
           const isActive = currentCategory === cat.id ? "active" : "";
           return `
-            <button class="cat-pill ${isActive}" data-cat="${cat.id}">
+            <button class="cat-pill ${isActive}" data-cat="${cat.id}" title="${escapeHtml(cat.label)}">
               <span>${cat.icon}</span>
-              <span>${cat.label}</span>
+              <span>${escapeHtml(cat.label)}</span>
             </button>
           `;
         }).join("");
 
-        track.querySelectorAll(".cat-pill").forEach(btn => {
+        // Nếu Admin đang mở khóa, thêm nút "⚙️ Quản lý Mục" ở thanh trượt
+        if (isEditMode) {
+          pillsHtml += `
+            <button type="button" id="btnOpenCategoryModal" class="cat-pill cat-pill-admin-manage" title="Quản lý / Đổi tên / Thêm / Xóa mục chính">
+              <span>⚙️ Quản lý Mục</span>
+            </button>
+          `;
+        }
+
+        track.innerHTML = pillsHtml;
+
+        track.querySelectorAll(".cat-pill:not(#btnOpenCategoryModal)").forEach(btn => {
           btn.addEventListener("click", () => {
             currentCategory = btn.dataset.cat;
             renderCategoryTabs();
@@ -2469,6 +2810,11 @@
             syncBottomDock();
           });
         });
+
+        const catManageBtn = document.getElementById("btnOpenCategoryModal");
+        if (catManageBtn) {
+          catManageBtn.addEventListener("click", openCategoryModal);
+        }
       }
 
       function syncBottomDock() {
@@ -2524,7 +2870,7 @@
           container.className = "item-grid" + (isEditMode ? " is-editing" : "");
           container.innerHTML = filtered.map(item => {
             const favClass = item.isFavorite ? "fav-active" : "";
-            const catObj = CATEGORIES.find(c => c.id === item.category) || { label: item.category };
+            const catObj = categoriesData.find(c => c.id === item.category) || { label: item.category };
             const iconChar = item.iconChar || item.title.substring(0, 2).toUpperCase();
             const hasVault = !!(vaultData[item.id] && (vaultData[item.id].username || vaultData[item.id].password));
 
@@ -2760,6 +3106,7 @@
       const sheetColor = document.getElementById("sheetColor");
 
       function openAddSheet() {
+        updateCategoryDropdowns();
         if (!isAdminLoggedIn) {
           openAdminAuthModal();
           showToast("Vui lòng đăng nhập Admin để thêm website!", "error");
@@ -2777,6 +3124,7 @@
       }
 
       function openEditSheet(id) {
+        updateCategoryDropdowns();
         if (!isAdminLoggedIn) {
           openAdminAuthModal();
           showToast("Vui lòng đăng nhập Admin để sửa liên kết!", "error");
@@ -2936,10 +3284,21 @@
         if (e.target === changePinOverlay) closeChangePinModal();
       });
 
-      adminAuthForm.addEventListener("submit", (e) => {
+      adminAuthForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const entered = adminPinInput.value.trim();
-        if (entered === adminPin) {
+        const salt = localStorage.getItem("teacher_hub_admin_salt");
+        const storedHash = localStorage.getItem("teacher_hub_admin_hash");
+
+        if (!salt || !storedHash) {
+          await checkAndMigrateAdminPin();
+        }
+
+        const curSalt = localStorage.getItem("teacher_hub_admin_salt");
+        const curHash = localStorage.getItem("teacher_hub_admin_hash");
+        const inputHash = await hashPassword(entered, curSalt);
+
+        if (inputHash === curHash) {
           isAdminLoggedIn = true;
           isEditMode = true;
           adminLockSvg.style.display = "none";
@@ -2947,6 +3306,7 @@
           editBtn.classList.add("active-mode");
           editBanner.style.display = "flex";
           closeAdminAuthModal();
+          renderCategoryTabs();
           renderItems();
           showToast("👑 Xác thực Admin thành công! Đã mở quyền Sửa/Thêm/Xóa.");
         } else {
@@ -2955,11 +3315,15 @@
         }
       });
 
-      changePinForm.addEventListener("submit", (e) => {
+      changePinForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const oldP = oldPinInput.value.trim();
         const newP = newPinInput.value.trim();
-        if (oldP !== adminPin) {
+        const salt = localStorage.getItem("teacher_hub_admin_salt");
+        const storedHash = localStorage.getItem("teacher_hub_admin_hash");
+
+        const oldHash = await hashPassword(oldP, salt);
+        if (oldHash !== storedHash) {
           showToast("Mật khẩu cũ không chính xác!", "error");
           return;
         }
@@ -2967,10 +3331,16 @@
           showToast("Mật khẩu mới phải từ 3 ký tự trở lên!", "error");
           return;
         }
-        adminPin = newP;
-        localStorage.setItem("teacher_hub_admin_pin", newP);
+
+        // Tạo Salt mới ngẫu nhiên và băm mật khẩu mới
+        const newSalt = generateSalt();
+        const newHash = await hashPassword(newP, newSalt);
+        localStorage.setItem("teacher_hub_admin_salt", newSalt);
+        localStorage.setItem("teacher_hub_admin_hash", newHash);
+        localStorage.removeItem("teacher_hub_admin_pin"); // Xóa bỏ văn bản thô nếu có
+
         closeChangePinModal();
-        showToast("🔑 Đã cập nhật mật khẩu Admin mới thành công!");
+        showToast("🔑 Đã cập nhật mật khẩu Admin mới (Salted SHA-256) thành công!");
       });
 
       btnChangePin.addEventListener("click", openChangePinModal);
@@ -2984,6 +3354,7 @@
         adminActiveSvg.style.display = "none";
         editBtn.classList.remove("active-mode");
         editBanner.style.display = "none";
+        renderCategoryTabs();
         renderItems();
         showToast("🔒 Đã khóa quyền Admin. Giáo viên chỉ được xem.");
       }
@@ -3944,6 +4315,259 @@
         if (item && item.url) {
           window.open(item.url, "_blank", "noopener,noreferrer");
         }
+      };
+
+
+      // ==========================================================================
+      // 17. CATEGORY MANAGEMENT (QUẢN LÝ CÁC MỤC CHÍNH)
+      // ==========================================================================
+      const categoryModal = document.getElementById("categoryModal");
+      const closeCategoryModalBtn = document.getElementById("closeCategoryModal");
+      const btnFinishCategoryModal = document.getElementById("btnFinishCategoryModal");
+      const categoryAddForm = document.getElementById("categoryAddForm");
+      const newCatIcon = document.getElementById("newCatIcon");
+      const newCatLabel = document.getElementById("newCatLabel");
+      const catManagerList = document.getElementById("catManagerList");
+      const catCountLabel = document.getElementById("catCountLabel");
+      const btnResetCategories = document.getElementById("btnResetCategories");
+      const emojiSuggestions = document.getElementById("emojiSuggestions");
+      const btnBannerManageCat = document.getElementById("btnBannerManageCat");
+
+      const editCategoryModal = document.getElementById("editCategoryModal");
+      const closeEditCategoryModalBtn = document.getElementById("closeEditCategoryModalBtn");
+      const btnCancelEditCat = document.getElementById("btnCancelEditCat");
+      const editCategoryForm = document.getElementById("editCategoryForm");
+      const editCatId = document.getElementById("editCatId");
+      const editCatIcon = document.getElementById("editCatIcon");
+      const editCatLabel = document.getElementById("editCatLabel");
+
+      function openCategoryModal() {
+        if (!isAdminLoggedIn) {
+          openAdminAuthModal();
+          showToast("Vui lòng đăng nhập Admin để quản lý danh mục!", "error");
+          return;
+        }
+        renderCategoryManagerList();
+        categoryModal.classList.add("active");
+        setTimeout(() => newCatLabel.focus(), 150);
+      }
+
+      function closeCategoryModal() {
+        categoryModal.classList.remove("active");
+      }
+
+      if (btnBannerManageCat) btnBannerManageCat.addEventListener("click", openCategoryModal);
+      if (closeCategoryModalBtn) closeCategoryModalBtn.addEventListener("click", closeCategoryModal);
+      if (btnFinishCategoryModal) btnFinishCategoryModal.addEventListener("click", closeCategoryModal);
+      if (categoryModal) {
+        categoryModal.addEventListener("click", (e) => {
+          if (e.target === categoryModal) closeCategoryModal();
+        });
+      }
+
+      // Quick Emoji picker clicks
+      if (emojiSuggestions) {
+        emojiSuggestions.querySelectorAll(".emoji-chip").forEach(btn => {
+          btn.addEventListener("click", () => {
+            newCatIcon.value = btn.dataset.emoji;
+          });
+        });
+      }
+
+      // Render danh sách trong Modal
+      function renderCategoryManagerList() {
+        if (!catManagerList) return;
+        const validCats = categoriesData.filter(c => c.id !== "all" && c.id !== "fav");
+        if (catCountLabel) catCountLabel.textContent = validCats.length;
+
+        catManagerList.innerHTML = validCats.map(cat => {
+          const count = linksData.filter(l => l.category === cat.id).length;
+          const isSystem = !!cat.system || cat.id === "tienich";
+
+          return `
+            <div class="cat-item-row" data-id="${cat.id}">
+              <div class="cat-item-left">
+                <div class="cat-item-icon-box">${cat.icon}</div>
+                <div style="min-width: 0;">
+                  <div class="cat-item-label">${escapeHtml(cat.label)}</div>
+                  <div class="cat-item-meta">
+                    ${count} website ${isSystem ? '• <span style="color:var(--primary); font-weight:700;">Hệ thống</span>' : ''}
+                  </div>
+                </div>
+              </div>
+              <div class="cat-item-actions">
+                <button type="button" class="icon-btn edit-cat-btn" data-id="${cat.id}" title="Đổi tên & biểu tượng" style="width:36px; height:36px;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 20h9"></path>
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                  </svg>
+                </button>
+                ${!isSystem ? `
+                  <button type="button" class="icon-btn del-cat-btn" data-id="${cat.id}" title="Xóa mục này" style="width:36px; height:36px; color:var(--danger);">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        catManagerList.querySelectorAll(".edit-cat-btn").forEach(btn => {
+          btn.addEventListener("click", () => openEditCategory(btn.dataset.id));
+        });
+
+        catManagerList.querySelectorAll(".del-cat-btn").forEach(btn => {
+          btn.addEventListener("click", () => deleteCategory(btn.dataset.id));
+        });
+      }
+
+      // THÊM MỤC MỚI
+      if (categoryAddForm) {
+        categoryAddForm.addEventListener("submit", (e) => {
+          e.preventDefault();
+          const label = newCatLabel.value.trim();
+          const icon = newCatIcon.value.trim() || "📁";
+
+          if (!label) return;
+
+          // Kiểm tra trùng tên
+          if (categoriesData.some(c => c.label.toLowerCase() === label.toLowerCase())) {
+            return showToast("Tên mục này đã tồn tại!", "error");
+          }
+
+          const newId = "cat-" + Date.now();
+          categoriesData.push({
+            id: newId,
+            label,
+            icon,
+            system: false
+          });
+
+          saveCategoriesStorage();
+          newCatLabel.value = "";
+          renderCategoryManagerList();
+          renderCategoryTabs();
+          updateCategoryDropdowns();
+          showToast(`Đã thêm mục "${label}" thành công!`);
+        });
+      }
+
+      // SỬA TÊN VÀ BIỂU TƯỢNG MỤC
+      function openEditCategory(catId) {
+        const cat = categoriesData.find(c => c.id === catId);
+        if (!cat) return;
+        editCatId.value = cat.id;
+        editCatIcon.value = cat.icon;
+        editCatLabel.value = cat.label;
+        editCategoryModal.classList.add("active");
+        setTimeout(() => editCatLabel.focus(), 150);
+      }
+
+      function closeEditCategoryModal() {
+        editCategoryModal.classList.remove("active");
+      }
+
+      if (closeEditCategoryModalBtn) closeEditCategoryModalBtn.addEventListener("click", closeEditCategoryModal);
+      if (btnCancelEditCat) btnCancelEditCat.addEventListener("click", closeEditCategoryModal);
+      if (editCategoryModal) {
+        editCategoryModal.addEventListener("click", (e) => {
+          if (e.target === editCategoryModal) closeEditCategoryModal();
+        });
+      }
+
+      if (editCategoryForm) {
+        editCategoryForm.addEventListener("submit", (e) => {
+          e.preventDefault();
+          const id = editCatId.value;
+          const label = editCatLabel.value.trim();
+          const icon = editCatIcon.value.trim() || "📁";
+          if (!id || !label) return;
+
+          const idx = categoriesData.findIndex(c => c.id === id);
+          if (idx !== -1) {
+            categoriesData[idx].label = label;
+            categoriesData[idx].icon = icon;
+            saveCategoriesStorage();
+            closeEditCategoryModal();
+            renderCategoryManagerList();
+            renderCategoryTabs();
+            updateCategoryDropdowns();
+            renderItems();
+            showToast(`Đã đổi tên mục thành "${label}"!`);
+          }
+        });
+      }
+
+      // XÓA MỤC (CHUYỂN WEBSITE SANG TIỆN ÍCH AN TOÀN)
+      function deleteCategory(catId) {
+        const cat = categoriesData.find(c => c.id === catId);
+        if (!cat) return;
+        if (cat.system || cat.id === "all" || cat.id === "fav" || cat.id === "tienich") {
+          return showToast("Không thể xóa mục mặc định của hệ thống", "error");
+        }
+
+        const affectedLinks = linksData.filter(l => l.category === catId);
+        const confirmMsg = affectedLinks.length > 0 
+          ? `Xóa mục "${cat.label}"? ${affectedLinks.length} website trong mục này sẽ được tự động chuyển sang mục "Tiện ích" để không bị mất link.`
+          : `Xóa mục "${cat.label}" khỏi danh sách?`;
+
+        if (confirm(confirmMsg)) {
+          // Chuyển các link bị ảnh hưởng sang 'tienich'
+          linksData.forEach(l => {
+            if (l.category === catId) l.category = "tienich";
+          });
+          saveToStorage();
+
+          categoriesData = categoriesData.filter(c => c.id !== catId);
+          saveCategoriesStorage();
+
+          if (currentCategory === catId) {
+            currentCategory = "all";
+          }
+
+          renderCategoryManagerList();
+          renderCategoryTabs();
+          updateCategoryDropdowns();
+          renderItems();
+          showToast(`Đã xóa mục "${cat.label}" thành công!`);
+        }
+      }
+
+      // KHÔI PHỤC DANH MỤC MẶC ĐỊNH
+      if (btnResetCategories) {
+        btnResetCategories.addEventListener("click", () => {
+          if (confirm("Khôi phục danh sách các mục chính về chuẩn mặc định ban đầu?")) {
+            categoriesData = [...DEFAULT_CATEGORIES];
+            saveCategoriesStorage();
+            renderCategoryManagerList();
+            renderCategoryTabs();
+            updateCategoryDropdowns();
+            renderItems();
+            showToast("Đã khôi phục danh mục chuẩn!");
+          }
+        });
+      }
+
+      // Helper methods on window.teacherPortal for programmatic tests
+      window.teacherPortal.openCategoryModal = openCategoryModal;
+      window.teacherPortal.openEditCategory = openEditCategory;
+      window.teacherPortal.deleteCategory = deleteCategory;
+      window.teacherPortal.isAdmin = () => isAdminLoggedIn;
+      window.teacherPortal.getLinks = () => linksData;
+      window.teacherPortal.addLink = (link) => {
+        linksData.push(link);
+        saveToStorage();
+        renderItems();
+      };
+      window.teacherPortal.updateAdminPin = async (newPin) => {
+        const newSalt = generateSalt();
+        const newHash = await hashPassword(newPin, newSalt);
+        localStorage.setItem("teacher_hub_admin_salt", newSalt);
+        localStorage.setItem("teacher_hub_admin_hash", newHash);
+        localStorage.removeItem("teacher_hub_admin_pin");
       };
 
       // KHỞI ĐỘNG
