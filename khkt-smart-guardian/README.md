@@ -27,6 +27,7 @@ khkt-smart-guardian/
 │   ├── core/                                # Module xử lý thuật toán & dữ liệu cốt lõi
 │   │   ├── data-models.js                   # Định nghĩa cấu trúc dữ liệu chuẩn (Activity, Risk, Contract)
 │   │   ├── app-classifier.js                # Bộ phân loại ứng dụng tự động (Game, MXH, Học tập)
+│   │   ├── web-blocker.js                   # Bộ lọc web xấu và màn hình chặn vi phạm
 │   │   └── local-nlp-analyzer.js            # Bộ lọc từ khóa nhạy cảm & an toàn mạng cục bộ
 │   ├── parent-dashboard/                    # Giao diện Web PWA dành cho Phụ huynh theo dõi
 │   │   ├── index.html                       # Bảng điều khiển thời gian thực, biểu đồ trực quan
@@ -34,8 +35,16 @@ khkt-smart-guardian/
 │   │   └── app.js                           # Xử lý sự kiện, đồng bộ dữ liệu và hiển thị cảnh báo
 │   └── mock-agent/                          # Trình giả lập thiết bị học sinh phục vụ thử nghiệm
 │       └── student-device-sim.js            # Phát sinh dữ liệu thực tế kiểm thử luồng đồng bộ
+├── android-app/                             # ỨNG DỤNG NATIVE ANDROID CHUẨN CÔNG NGHIỆP
+│   ├── app/src/main/java/                   # Toàn bộ mã nguồn Kotlin (Clean Architecture & Jetpack)
+│   │   ├── data/ (AppClassifier, WebFilterList)
+│   │   ├── service/ (UsageTracker, Accessibility, SafeVpn)
+│   │   ├── receiver/ (DeviceAdmin, BootReceiver)
+│   │   └── ui/ (MainActivity, BlockedActivity)
+│   ├── app/src/main/res/                    # Giao diện XML Dark Mode chuẩn Material3
+│   └── HUONG_DAN_DONG_GOI_APK_VA_LEN_STORE.md # Hướng dẫn xuất APK và lộ trình lên CH Play / App Store
 └── test/                                    # KIỂM THỬ TỰ ĐỘNG & BẰNG CHỨNG THỰC NGHIỆM
-    └── verify_pipeline.js                   # Kịch bản kiểm thử tự động 100% PASS
+    └── verify_pipeline.js                   # Kịch bản kiểm thử tự động toàn diện (Pass 100%)
 ```
 
 ---
