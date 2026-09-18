@@ -1,0 +1,14 @@
+[
+    {
+        "merged": "C:\\Users\\HPZBook\\.gradle\\daemon\\8.9\\vn.edu.cva.smartguardian.app-mergeDebugResources-33:\\layout\\activity_main.xml",
+        "source": "C:\\Users\\HPZBook\\.gradle\\daemon\\8.9\\vn.edu.cva.smartguardian.app-main-36:\\layout\\activity_main.xml"
+    },
+    {
+        "merged": "C:\\Users\\HPZBook\\.gradle\\daemon\\8.9\\vn.edu.cva.smartguardian.app-mergeDebugResources-33:\\layout\\activity_blocked.xml",
+        "source": "C:\\Users\\HPZBook\\.gradle\\daemon\\8.9\\vn.edu.cva.smartguardian.app-main-36:\\layout\\activity_blocked.xml"
+    },
+    {
+        "merged": "vn.edu.cva.smartguardian.app-mergeDebugResources-33:/layout/activity_main.xml",
+        "source": "vn.edu.cva.smartguardian.app-main-36:/layout/activity_main.xml"
+    }
+]

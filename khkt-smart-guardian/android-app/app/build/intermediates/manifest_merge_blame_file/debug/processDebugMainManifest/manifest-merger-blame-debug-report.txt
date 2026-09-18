@@ -1,0 +1,270 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="vn.edu.cva.smartguardian.debug"
+4    android:versionCode="1"
+5    android:versionName="1.0.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="26"
+9        android:targetSdkVersion="35" />
+10
+11    <!-- QUYỀN TRUY CẬP HỆ THỐNG CỐT LÕI -->
+12    <uses-permission android:name="android.permission.INTERNET" />
+12-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:6:5-67
+12-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:6:22-64
+13    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+13-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:7:5-79
+13-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:7:22-76
+14    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+14-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:8:5-81
+14-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:8:22-78
+15    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+15-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:9:5-77
+15-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:9:22-74
+16    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+16-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:10:5-89
+16-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:10:22-86
+17    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+17-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:11:5-77
+17-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:11:22-74
+18    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+18-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:12:5-78
+18-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:12:22-75
+19
+20    <!-- QUYỀN ĐO LƯỜNG THỜI GIAN ỨNG DỤNG (CẦN PHỤ HUYNH BẬT TRONG CÀI ĐẶT) -->
+21    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
+21-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:15:5-17:47
+21-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:16:9-62
+22
+23    <permission
+23-->[androidx.core:core:1.15.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\2081d38d206b3ed30c6dafb6bcef5935\transformed\core-1.15.0\AndroidManifest.xml:22:5-24:47
+24        android:name="vn.edu.cva.smartguardian.debug.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+24-->[androidx.core:core:1.15.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\2081d38d206b3ed30c6dafb6bcef5935\transformed\core-1.15.0\AndroidManifest.xml:23:9-81
+25        android:protectionLevel="signature" />
+25-->[androidx.core:core:1.15.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\2081d38d206b3ed30c6dafb6bcef5935\transformed\core-1.15.0\AndroidManifest.xml:24:9-44
+26
+27    <uses-permission android:name="vn.edu.cva.smartguardian.debug.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+27-->[androidx.core:core:1.15.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\2081d38d206b3ed30c6dafb6bcef5935\transformed\core-1.15.0\AndroidManifest.xml:26:5-97
+27-->[androidx.core:core:1.15.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\2081d38d206b3ed30c6dafb6bcef5935\transformed\core-1.15.0\AndroidManifest.xml:26:22-94
+28
+29    <application
+29-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:19:5-102:19
+30        android:allowBackup="false"
+30-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:20:9-36
+31        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+31-->[androidx.core:core:1.15.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\2081d38d206b3ed30c6dafb6bcef5935\transformed\core-1.15.0\AndroidManifest.xml:28:18-86
+32        android:debuggable="true"
+33        android:extractNativeLibs="false"
+34        android:icon="@android:drawable/ic_dialog_info"
+34-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:21:9-56
+35        android:label="@string/app_name"
+35-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:22:9-41
+36        android:roundIcon="@android:drawable/ic_dialog_info"
+36-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:23:9-61
+37        android:supportsRtl="true"
+37-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:24:9-35
+38        android:theme="@style/Theme.Material3.DayNight.NoActionBar" >
+38-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:25:9-68
+39
+40        <!-- MÀN HÌNH CHÍNH (THIẾT LẬP DÀNH CHO PHỤ HUYNH) -->
+41        <activity
+41-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:28:9-35:20
+42            android:name="vn.edu.cva.smartguardian.ui.MainActivity"
+42-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:29:13-44
+43            android:exported="true" >
+43-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:30:13-36
+44            <intent-filter>
+44-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:31:13-34:29
+45                <action android:name="android.intent.action.MAIN" />
+45-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:32:17-69
+45-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:32:25-66
+46
+47                <category android:name="android.intent.category.LAUNCHER" />
+47-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:33:17-77
+47-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:33:27-74
+48            </intent-filter>
+49        </activity>
+50
+51        <!-- MÀN HÌNH CẢNH BÁO KHI TRUY CẬP WEBSITE BỊ CHẶN -->
+52        <activity
+52-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:38:9-41:75
+53            android:name="vn.edu.cva.smartguardian.ui.BlockedActivity"
+53-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:39:13-47
+54            android:exported="false"
+54-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:40:13-37
+55            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
+55-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:41:13-72
+56
+57        <!-- DỊCH VỤ THEO DÕI THỜI GIAN CHẠY NGẦM (USAGE TRACKER) -->
+58        <service
+58-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:44:9-52:19
+59            android:name="vn.edu.cva.smartguardian.service.UsageTrackerService"
+59-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:45:13-56
+60            android:enabled="true"
+60-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:46:13-35
+61            android:exported="false"
+61-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:47:13-37
+62            android:foregroundServiceType="specialUse" >
+62-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:48:13-55
+63            <property
+63-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:49:13-51:94
+64                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+64-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:50:17-76
+65                android:value="Parental monitoring and student digital wellbeing tracking" />
+65-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:51:17-91
+66        </service>
+67
+68        <!-- DỊCH VỤ TRỢ NĂNG THEO DÕI MỞ APP & TRÌNH DUYỆT (ACCESSIBILITY) -->
+69        <service
+69-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:55:9-65:19
+70            android:name="vn.edu.cva.smartguardian.service.GuardianAccessibilityService"
+70-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:56:13-65
+71            android:exported="true"
+71-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:58:13-36
+72            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" >
+72-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:57:13-79
+73            <intent-filter>
+73-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:59:13-61:29
+74                <action android:name="android.accessibilityservice.AccessibilityService" />
+74-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:60:17-92
+74-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:60:25-89
+75            </intent-filter>
+76
+77            <meta-data
+77-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:62:13-64:72
+78                android:name="android.accessibilityservice"
+78-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:63:17-60
+79                android:resource="@xml/accessibility_service_config" />
+79-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:64:17-69
+80        </service>
+81
+82        <!-- DỊCH VỤ TƯỜNG LỬA CHẶN DOMAIN ĐỘC HẠI (VPN LOCAL DNS) -->
+83        <service
+83-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:68:9-75:19
+84            android:name="vn.edu.cva.smartguardian.service.SafeVpnFilterService"
+84-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:69:13-57
+85            android:exported="false"
+85-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:71:13-37
+86            android:permission="android.permission.BIND_VPN_SERVICE" >
+86-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:70:13-69
+87            <intent-filter>
+87-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:72:13-74:29
+88                <action android:name="android.net.VpnService" />
+88-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:73:17-65
+88-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:73:25-62
+89            </intent-filter>
+90        </service>
+91
+92        <!-- QUẢN TRỊ VIÊN THIẾT BỊ (CHỐNG GỠ CÀI ĐẶT) -->
+93        <receiver
+93-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:78:9-90:20
+94            android:name="vn.edu.cva.smartguardian.receiver.SmartGuardianAdminReceiver"
+94-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:79:13-64
+95            android:description="@string/admin_receiver_desc"
+95-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:80:13-62
+96            android:exported="true"
+96-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:83:13-36
+97            android:label="@string/app_name"
+97-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:81:13-45
+98            android:permission="android.permission.BIND_DEVICE_ADMIN" >
+98-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:82:13-70
+99            <meta-data
+99-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:84:13-86:65
+100                android:name="android.app.device_admin"
+100-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:85:17-56
+101                android:resource="@xml/device_admin_policies" />
+101-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:86:17-62
+102
+103            <intent-filter>
+103-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:87:13-89:29
+104                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+104-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:88:17-82
+104-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:88:25-79
+105            </intent-filter>
+106        </receiver>
+107
+108        <!-- BẮT SỰ KIỆN KHỞI ĐỘNG LẠI MÁY ĐỂ TỰ ĐỘNG CHẠY NGẦM -->
+109        <receiver
+109-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:93:9-100:20
+110            android:name="vn.edu.cva.smartguardian.receiver.BootReceiver"
+110-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:94:13-50
+111            android:enabled="true"
+111-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:95:13-35
+112            android:exported="true" >
+112-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:96:13-36
+113            <intent-filter>
+113-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:97:13-99:29
+114                <action android:name="android.intent.action.BOOT_COMPLETED" />
+114-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:98:17-79
+114-->C:\Users\HPZBook\Desktop\PM ALL\khkt-smart-guardian\android-app\app\src\main\AndroidManifest.xml:98:25-76
+115            </intent-filter>
+116        </receiver>
+117
+118        <provider
+118-->[androidx.emoji2:emoji2:1.3.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\effa4edb0027736322f44aee42e46366\transformed\emoji2-1.3.0\AndroidManifest.xml:24:9-32:20
+119            android:name="androidx.startup.InitializationProvider"
+119-->[androidx.emoji2:emoji2:1.3.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\effa4edb0027736322f44aee42e46366\transformed\emoji2-1.3.0\AndroidManifest.xml:25:13-67
+120            android:authorities="vn.edu.cva.smartguardian.debug.androidx-startup"
+120-->[androidx.emoji2:emoji2:1.3.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\effa4edb0027736322f44aee42e46366\transformed\emoji2-1.3.0\AndroidManifest.xml:26:13-68
+121            android:exported="false" >
+121-->[androidx.emoji2:emoji2:1.3.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\effa4edb0027736322f44aee42e46366\transformed\emoji2-1.3.0\AndroidManifest.xml:27:13-37
+122            <meta-data
+122-->[androidx.emoji2:emoji2:1.3.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\effa4edb0027736322f44aee42e46366\transformed\emoji2-1.3.0\AndroidManifest.xml:29:13-31:52
+123                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+123-->[androidx.emoji2:emoji2:1.3.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\effa4edb0027736322f44aee42e46366\transformed\emoji2-1.3.0\AndroidManifest.xml:30:17-75
+124                android:value="androidx.startup" />
+124-->[androidx.emoji2:emoji2:1.3.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\effa4edb0027736322f44aee42e46366\transformed\emoji2-1.3.0\AndroidManifest.xml:31:17-49
+125            <meta-data
+125-->[androidx.lifecycle:lifecycle-process:2.8.7] C:\Users\HPZBook\.gradle\caches\8.9\transforms\7dbe258cf1959c82d096d91fee44faee\transformed\lifecycle-process-2.8.7\AndroidManifest.xml:29:13-31:52
+126                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+126-->[androidx.lifecycle:lifecycle-process:2.8.7] C:\Users\HPZBook\.gradle\caches\8.9\transforms\7dbe258cf1959c82d096d91fee44faee\transformed\lifecycle-process-2.8.7\AndroidManifest.xml:30:17-78
+127                android:value="androidx.startup" />
+127-->[androidx.lifecycle:lifecycle-process:2.8.7] C:\Users\HPZBook\.gradle\caches\8.9\transforms\7dbe258cf1959c82d096d91fee44faee\transformed\lifecycle-process-2.8.7\AndroidManifest.xml:31:17-49
+128            <meta-data
+128-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:29:13-31:52
+129                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+129-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:30:17-85
+130                android:value="androidx.startup" />
+130-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:31:17-49
+131        </provider>
+132
+133        <receiver
+133-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:34:9-52:20
+134            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+134-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:35:13-76
+135            android:directBootAware="false"
+135-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:36:13-44
+136            android:enabled="true"
+136-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:37:13-35
+137            android:exported="true"
+137-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:38:13-36
+138            android:permission="android.permission.DUMP" >
+138-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:39:13-57
+139            <intent-filter>
+139-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:40:13-42:29
+140                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+140-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:41:17-91
+140-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:41:25-88
+141            </intent-filter>
+142            <intent-filter>
+142-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:43:13-45:29
+143                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+143-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:44:17-85
+143-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:44:25-82
+144            </intent-filter>
+145            <intent-filter>
+145-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:46:13-48:29
+146                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+146-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:47:17-88
+146-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:47:25-85
+147            </intent-filter>
+148            <intent-filter>
+148-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:49:13-51:29
+149                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+149-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:50:17-95
+149-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\HPZBook\.gradle\caches\8.9\transforms\656ad1b5396f13e3e5344e940326fc80\transformed\profileinstaller-1.4.0\AndroidManifest.xml:50:25-92
+150            </intent-filter>
+151        </receiver>
+152    </application>
+153
+154</manifest>

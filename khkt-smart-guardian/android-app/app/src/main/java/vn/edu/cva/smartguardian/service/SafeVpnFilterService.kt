@@ -68,7 +68,7 @@ class SafeVpnFilterService : VpnService() {
         val notification: Notification = NotificationCompat.Builder(this, VPN_CHANNEL_ID)
             .setContentTitle("Tường lửa CVA-SmartGuardian")
             .setContentText("Đang kích hoạt lá chắn bảo vệ DNS chống lừa đảo & nội dung xấu")
-            .setSmallIcon(android.R.drawable.ic_dialog_shield)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)

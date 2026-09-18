@@ -1,0 +1,22 @@
+[
+    {
+        "merged": "C:\\Users\\HPZBook\\.gradle\\daemon\\8.9\\vn.edu.cva.smartguardian.app-debug-34:\\layout_activity_main.xml.flat",
+        "source": "C:\\Users\\HPZBook\\.gradle\\daemon\\8.9\\vn.edu.cva.smartguardian.app-main-36:\\layout\\activity_main.xml"
+    },
+    {
+        "merged": "C:\\Users\\HPZBook\\.gradle\\daemon\\8.9\\vn.edu.cva.smartguardian.app-debug-34:\\xml_accessibility_service_config.xml.flat",
+        "source": "C:\\Users\\HPZBook\\.gradle\\daemon\\8.9\\vn.edu.cva.smartguardian.app-main-36:\\xml\\accessibility_service_config.xml"
+    },
+    {
+        "merged": "vn.edu.cva.smartguardian.app-debug-34:/layout_activity_main.xml.flat",
+        "source": "vn.edu.cva.smartguardian.app-main-36:/layout/activity_main.xml"
+    },
+    {
+        "merged": "C:\\Users\\HPZBook\\.gradle\\daemon\\8.9\\vn.edu.cva.smartguardian.app-debug-34:\\xml_device_admin_policies.xml.flat",
+        "source": "C:\\Users\\HPZBook\\.gradle\\daemon\\8.9\\vn.edu.cva.smartguardian.app-main-36:\\xml\\device_admin_policies.xml"
+    },
+    {
+        "merged": "C:\\Users\\HPZBook\\.gradle\\daemon\\8.9\\vn.edu.cva.smartguardian.app-debug-34:\\layout_activity_blocked.xml.flat",
+        "source": "C:\\Users\\HPZBook\\.gradle\\daemon\\8.9\\vn.edu.cva.smartguardian.app-main-36:\\layout\\activity_blocked.xml"
+    }
+]

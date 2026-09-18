@@ -88,7 +88,7 @@ class UsageTrackerService : Service() {
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("CVA-SmartGuardian đang bảo vệ")
             .setContentText("Hệ thống đồng hành và bảo vệ số đang hoạt động tích cực")
-            .setSmallIcon(android.R.drawable.ic_dialog_shield)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
