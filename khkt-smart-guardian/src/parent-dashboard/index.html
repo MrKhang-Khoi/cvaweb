@@ -196,6 +196,118 @@
             <span>Bộ lọc từ khóa chạy 100% cục bộ trên điện thoại con, bảo vệ tuyệt đối bí mật riêng tư gia đình theo Nghị định 13/2023/NĐ-CP.</span>
           </div>
         </div>
+
+        <!-- BẢNG TƯỜNG LỬA CHẶN WEBSITE ĐỘC HẠI (SAFE WEB SHIELD) -->
+        <div class="panel-card" style="border-top: 4px solid var(--primary);">
+          <div class="panel-head">
+            <h3 class="panel-title">🛡️ Tường Lửa Chặn Web Độc Hại (Safe Web Shield)</h3>
+            <span style="font-size: 0.72rem; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 10px; font-weight: 700;">Đang Bật</span>
+          </div>
+
+          <!-- 4 CHỐT CHẶN BẢO VỆ TỰ ĐỘNG -->
+          <div style="margin-bottom: 16px;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">
+              DANH MỤC TỰ ĐỘNG NGĂN CHẶN THỜI GIAN THỰC:
+            </div>
+
+            <div class="shield-toggle-row">
+              <div class="shield-toggle-info">
+                <span class="shield-toggle-icon">🔞</span>
+                <div>
+                  <div class="shield-toggle-title">Chặn Web Khiêu dâm / Tình dục / Người lớn</div>
+                  <div class="shield-toggle-sub">Tự động chặn các trang web 18+, đồi trụy theo Luật Trẻ em 2016</div>
+                </div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="toggleBlockAdult" checked>
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+
+            <div class="shield-toggle-row">
+              <div class="shield-toggle-info">
+                <span class="shield-toggle-icon">🎣</span>
+                <div>
+                  <div class="shield-toggle-title">Chặn Web Lừa đảo / Nạp thẻ ảo / Phishing</div>
+                  <div class="shield-toggle-sub">Chống lừa đảo tặng quà, nạp quân huy lậu, đánh cắp mật khẩu</div>
+                </div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="toggleBlockScam" checked>
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+
+            <div class="shield-toggle-row">
+              <div class="shield-toggle-info">
+                <span class="shield-toggle-icon">🎰</span>
+                <div>
+                  <div class="shield-toggle-title">Chặn Cờ bạc trực tuyến / Tài xỉu / Cá độ</div>
+                  <div class="shield-toggle-sub">Ngăn chặn các website cờ bạc, tài xỉu, cá độ bóng đá học đường</div>
+                </div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="toggleBlockGambling" checked>
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+
+            <div class="shield-toggle-row">
+              <div class="shield-toggle-info">
+                <span class="shield-toggle-icon">⚔️</span>
+                <div>
+                  <div class="shield-toggle-title">Chặn Mua bán Vũ khí / Kích động Bạo lực</div>
+                  <div class="shield-toggle-sub">Phát hiện và ngăn chặn nội dung hung khí, kích động đánh nhau</div>
+                </div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="toggleBlockViolence" checked>
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- DANH SÁCH CHẶN RIÊNG CỦA PHỤ HUYNH -->
+          <div style="background: #f8fafc; padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--card-border); margin-bottom: 14px;">
+            <div style="font-size: 0.82rem; font-weight: 700; margin-bottom: 6px;">
+              ➕ Thêm Website Cấm Riêng Của Gia Đình:
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="inputCustomDomain" placeholder="Ví dụ: facebook.com, shopacc.vn" style="flex: 1; padding: 8px 12px; border: 1px solid var(--card-border); border-radius: 6px; font-size: 0.82rem;">
+              <button type="button" id="btnAddCustomDomain" class="btn-action btn-primary" style="padding: 8px 14px; font-size: 0.8rem;">
+                + Thêm Chặn
+              </button>
+            </div>
+            <div class="custom-domains-wrap" id="customDomainList">
+              <!-- Render danh sách domain riêng -->
+            </div>
+          </div>
+
+          <!-- CÔNG CỤ THỬ NGHIỆM TƯỜNG LỬA CHẶN WEB (SANDBOX TESTER CHO BAN GIÁM KHẢO) -->
+          <div class="url-tester-box">
+            <div style="font-size: 0.82rem; font-weight: 800; color: #1e40af; margin-bottom: 4px;">
+              🧪 Hộp Thử Nghiệm Tường Lửa (Kiểm tra xem link có bị chặn không):
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="inputTestUrl" value="https://napthegamelau.com/hack" style="flex: 1; padding: 8px 10px; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 0.82rem; background: #fff;">
+              <button type="button" id="btnTestUrl" class="btn-action btn-secondary" style="font-size: 0.8rem; padding: 8px 12px; border-color: #93c5fd;">
+                ⚡ Kiểm Tra
+              </button>
+            </div>
+            <div id="testerResultBox" class="tester-result"></div>
+          </div>
+
+          <!-- LỊCH SỬ CÁC LẦN CON BỊ CHẶN TRUY CẬP (BLOCKED HISTORY) -->
+          <div style="margin-top: 16px;">
+            <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-main); margin-bottom: 8px; display: flex; justify-content: space-between;">
+              <span>🚨 Nhật Ký Đã Ngăn Chặn Truy Cập:</span>
+              <span id="blockedCountBadge" style="color: var(--danger); font-weight: 800;">2 lần</span>
+            </div>
+            <div id="blockedAttemptsFeed" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto;">
+              <!-- Render động qua JavaScript -->
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -204,6 +316,7 @@
   <script src="../core/data-models.js"></script>
   <script src="../core/app-classifier.js"></script>
   <script src="../core/local-nlp-analyzer.js"></script>
+  <script src="../core/web-blocker.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

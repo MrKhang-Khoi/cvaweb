@@ -400,3 +400,143 @@ body {
 .btn-secondary:hover {
   background: #e2e8f0;
 }
+
+/* ==========================================================================
+   SAFE WEB SHIELD & FIREWALL STYLES
+   ========================================================================== */
+.shield-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--card-border);
+  margin-bottom: 8px;
+}
+
+.shield-toggle-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shield-toggle-icon {
+  font-size: 1.25rem;
+}
+
+.shield-toggle-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.shield-toggle-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* TOGGLE SWITCH (CHECKBOX) */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider-toggle {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e1;
+  transition: .3s;
+  border-radius: 24px;
+}
+
+.slider-toggle:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+
+input:checked + .slider-toggle {
+  background-color: #10b981;
+}
+
+input:checked + .slider-toggle:before {
+  transform: translateX(20px);
+}
+
+/* CUSTOM DOMAIN CHIPS */
+.custom-domains-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.domain-chip {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.domain-chip-remove {
+  cursor: pointer;
+  color: #ef4444;
+  font-weight: 900;
+}
+
+/* URL TESTER SANDBOX */
+.url-tester-box {
+  background: linear-gradient(135deg, #f8fafc, #eff6ff);
+  border: 1.5px dashed #93c5fd;
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  margin-top: 14px;
+}
+
+.tester-result {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  display: none;
+}
+
+.tester-result.blocked {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #f87171;
+  display: block;
+}
+
+.tester-result.safe {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #34d399;
+  display: block;
+}
+

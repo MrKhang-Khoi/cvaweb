@@ -106,6 +106,63 @@ server.listen(PORT, async () => {
     // Chụp ảnh Dashboard sau khi có cảnh báo vượt hạn mức
     await desktopPage.screenshot({ path: path.join(ARTIFACTS_DIR, 'khkt_parent_dashboard_alert_triggered.png') });
 
+    // --- 3.5. TEST TƯỜNG LỬA CHẶN WEB ĐỘC HẠI (SAFE WEB SHIELD) ---
+    console.log('\n--- 3.5. TEST TƯỜNG LỬA CHẶN WEB ĐỘC HẠI (SAFE WEB SHIELD) ---');
+    // 1. Kiểm tra các nút toggle bảo vệ
+    const isAdultChecked = await desktopPage.locator('#toggleBlockAdult').isChecked();
+    const isScamChecked = await desktopPage.locator('#toggleBlockScam').isChecked();
+    const isGamblingChecked = await desktopPage.locator('#toggleBlockGambling').isChecked();
+    console.log('Trạng thái chốt chặn Tình dục:', isAdultChecked, '| Lừa đảo:', isScamChecked, '| Cờ bạc:', isGamblingChecked);
+    if (!isAdultChecked || !isScamChecked || !isGamblingChecked) {
+      throw new Error('Các chốt chặn website độc hại chưa được bật mặc định');
+    }
+
+    // 2. Thêm domain cấm riêng của phụ huynh
+    await desktopPage.locator('#inputCustomDomain').fill('webxau.vn');
+    await desktopPage.locator('#btnAddCustomDomain').click();
+    await desktopPage.waitForTimeout(300);
+    const customListText = await desktopPage.locator('#customDomainList').innerText();
+    console.log('Danh sách domain riêng sau khi thêm:', customListText);
+    if (!customListText.includes('webxau.vn')) {
+      throw new Error('Chưa thêm được domain tùy chỉnh vào danh sách cấm');
+    }
+
+    // 3. Thử nghiệm URL Tester Sandbox với link khiêu dâm
+    await desktopPage.locator('#inputTestUrl').fill('https://phimsexvn.net/video-hot');
+    await desktopPage.locator('#btnTestUrl').click();
+    await desktopPage.waitForTimeout(300);
+    const resultText = await desktopPage.locator('#testerResultBox').innerText();
+    const isBlockedClass = await desktopPage.locator('#testerResultBox').evaluate(el => el.classList.contains('blocked'));
+    console.log('Kết quả kiểm tra link phimsexvn.net:', isBlockedClass ? 'CHẶN THÀNH CÔNG' : 'FAIL');
+    console.log('Nội dung kết quả:', resultText.slice(0, 60) + '...');
+    if (!isBlockedClass || !resultText.includes('PHÁT HIỆN VI PHẠM')) {
+      throw new Error('Tường lửa không phát hiện và chặn website khiêu dâm');
+    }
+
+    // 4. Thử nghiệm URL an toàn (Azota)
+    await desktopPage.locator('#inputTestUrl').fill('https://azota.vn/bai-tap');
+    await desktopPage.locator('#btnTestUrl').click();
+    await desktopPage.waitForTimeout(300);
+    const safeResultText = await desktopPage.locator('#testerResultBox').innerText();
+    const isSafeClass = await desktopPage.locator('#testerResultBox').evaluate(el => el.classList.contains('safe'));
+    console.log('Kết quả kiểm tra link Azota an toàn:', isSafeClass ? 'PASS' : 'FAIL');
+    if (!isSafeClass || !safeResultText.includes('TRANG AN TOÀN')) {
+      throw new Error('Hệ thống chặn nhầm website học tập an toàn');
+    }
+
+    // 5. Mở trang màn hình chặn blocked.html và chụp ảnh bằng chứng
+    const blockedPage = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    await blockedPage.goto(`http://localhost:${PORT}/src/parent-dashboard/blocked.html?reason=Phat%20hien%20noi%20dung%20khieu%20dam%20va%20lua%20dao&cat=ADULT&url=https://phimsex.com/video`, { waitUntil: 'load' });
+    await blockedPage.waitForTimeout(400);
+    const blockedTitle = await blockedPage.locator('h1').innerText();
+    console.log('Tiêu đề màn hình chặn:', blockedTitle);
+    if (!blockedTitle.includes('TRANG WEB ĐÃ BỊ CHẶN')) {
+      throw new Error('Màn hình cảnh báo blocked.html không hiển thị đúng');
+    }
+    await blockedPage.screenshot({ path: path.join(ARTIFACTS_DIR, 'khkt_blocked_splash_page.png') });
+    console.log('Đã chụp ảnh màn hình chặn: khkt_blocked_splash_page.png');
+    await blockedPage.close();
+
     // --- 4. TEST MOBILE VIEWPORT (390x844) & CHỐNG TRÀN NGANG ---
     console.log('\n--- 4. TEST MOBILE VIEWPORT (390x844) ---');
     const mobilePage = await browser.newPage({

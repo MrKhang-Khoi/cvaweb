@@ -5,6 +5,7 @@
 
 const { classifyApp } = require('../core/app-classifier');
 const { analyzeTextRisk } = require('../core/local-nlp-analyzer');
+const { WebBlockerEngine } = require('../core/web-blocker');
 const { DailyReport, ActivitySession } = require('../core/data-models');
 
 class StudentDeviceSimulator {
@@ -12,6 +13,17 @@ class StudentDeviceSimulator {
     this.studentName = `${studentName} (${studentClass})`;
     this.currentSessions = [];
     this.riskLogs = [];
+    this.webBlocker = new WebBlockerEngine();
+    this.blockedAttempts = [];
+  }
+
+  // Giả lập học sinh bấm vào 1 liên kết trên trình duyệt
+  simulateBrowseUrl(url) {
+    const result = this.webBlocker.checkUrl(url);
+    if (result.isBlocked) {
+      this.blockedAttempts.unshift(result);
+    }
+    return result;
   }
 
   // Giả lập học sinh mở một ứng dụng và sử dụng trong N phút

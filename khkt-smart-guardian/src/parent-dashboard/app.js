@@ -282,6 +282,160 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Khởi tạo Web Blocker Engine
+  const webBlocker = new WebBlockerEngine(['shopaccgiare.vn', 'hackgame.xyz']);
+  webBlocker.blockedHistory = [
+    {
+      id: 'blk_1',
+      category: 'adult',
+      categoryName: 'Nội dung khiêu dâm / Tình dục / Người lớn',
+      reason: 'Trang web có nội dung khiêu dâm người lớn không phù hợp với học sinh',
+      domain: 'phimsexvn.net',
+      url: 'https://phimsexvn.net/clip-hot',
+      severity: 'danger',
+      timestamp: '15:10 Hôm nay'
+    },
+    {
+      id: 'blk_2',
+      category: 'scam',
+      categoryName: 'Website lừa đảo / Nạp thẻ game giả mạo',
+      reason: 'Phát hiện đường dẫn lừa đảo nạp quân huy lậu',
+      domain: 'napthegamelau.com',
+      url: 'https://napthegamelau.com/hack-quan-huy',
+      severity: 'danger',
+      timestamp: '11:25 Hôm nay'
+    }
+  ];
+
+  // DOM elements của Web Blocker
+  const toggleBlockAdult = document.getElementById('toggleBlockAdult');
+  const toggleBlockScam = document.getElementById('toggleBlockScam');
+  const toggleBlockGambling = document.getElementById('toggleBlockGambling');
+  const toggleBlockViolence = document.getElementById('toggleBlockViolence');
+
+  const inputCustomDomain = document.getElementById('inputCustomDomain');
+  const btnAddCustomDomain = document.getElementById('btnAddCustomDomain');
+  const customDomainList = document.getElementById('customDomainList');
+
+  const inputTestUrl = document.getElementById('inputTestUrl');
+  const btnTestUrl = document.getElementById('btnTestUrl');
+  const testerResultBox = document.getElementById('testerResultBox');
+
+  const blockedAttemptsFeed = document.getElementById('blockedAttemptsFeed');
+  const blockedCountBadge = document.getElementById('blockedCountBadge');
+
+  function renderWebBlockerUI() {
+    // 1. Render danh sách domain riêng của phụ huynh
+    if (customDomainList) {
+      customDomainList.innerHTML = '';
+      if (webBlocker.customBlocklist.length === 0) {
+        customDomainList.innerHTML = '<span style="font-size: 0.74rem; color: var(--text-muted); font-style: italic;">Chưa có domain riêng nào.</span>';
+      } else {
+        webBlocker.customBlocklist.forEach(domain => {
+          const chip = document.createElement('span');
+          chip.className = 'domain-chip';
+          chip.innerHTML = `
+            <span>🌐 ${domain}</span>
+            <span class="domain-chip-remove" data-domain="${domain}" title="Xóa bỏ chặn">×</span>
+          `;
+          customDomainList.appendChild(chip);
+        });
+      }
+    }
+
+    // 2. Render lịch sử các lần chặn
+    if (blockedAttemptsFeed) {
+      blockedAttemptsFeed.innerHTML = '';
+      blockedCountBadge.textContent = `${webBlocker.blockedHistory.length} lần`;
+
+      if (webBlocker.blockedHistory.length === 0) {
+        blockedAttemptsFeed.innerHTML = `
+          <div style="font-size: 0.78rem; color: var(--text-muted); padding: 8px; text-align: center;">
+            Chưa có lần chặn nào trong ngày.
+          </div>
+        `;
+      } else {
+        webBlocker.blockedHistory.forEach(b => {
+          const item = document.createElement('div');
+          item.style.cssText = 'padding: 8px 12px; background: #fff; border: 1px solid #fecaca; border-radius: 6px; font-size: 0.78rem; border-left: 3px solid #ef4444;';
+          item.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+              <strong style="color: #b91c1c;">🚫 ĐÃ CHẶN: ${b.domain}</strong>
+              <span style="font-size: 0.68rem; color: var(--text-muted);">${b.timestamp || 'Vừa xong'}</span>
+            </div>
+            <div style="color: var(--text-main);">${b.reason}</div>
+            <div style="font-size: 0.7rem; color: #475569; margin-top: 2px; text-decoration: line-through; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              ${b.url}
+            </div>
+          `;
+          blockedAttemptsFeed.appendChild(item);
+        });
+      }
+    }
+  }
+
+  // Lắng nghe các nút gạt cấu hình chặn
+  if (toggleBlockAdult) toggleBlockAdult.addEventListener('change', e => webBlocker.updateSettings({ blockAdult: e.target.checked }));
+  if (toggleBlockScam) toggleBlockScam.addEventListener('change', e => webBlocker.updateSettings({ blockScam: e.target.checked }));
+  if (toggleBlockGambling) toggleBlockGambling.addEventListener('change', e => webBlocker.updateSettings({ blockGambling: e.target.checked }));
+  if (toggleBlockViolence) toggleBlockViolence.addEventListener('change', e => webBlocker.updateSettings({ blockViolence: e.target.checked }));
+
+  // Thêm domain riêng
+  if (btnAddCustomDomain && inputCustomDomain) {
+    btnAddCustomDomain.addEventListener('click', () => {
+      const val = inputCustomDomain.value.trim();
+      if (!val) return;
+      if (webBlocker.addCustomDomain(val)) {
+        inputCustomDomain.value = '';
+        renderWebBlockerUI();
+        alert(`🛡️ Đã thêm '${val}' vào danh sách cấm truy cập của gia đình!`);
+      } else {
+        alert('Tên miền không hợp lệ hoặc đã có trong danh sách cấm.');
+      }
+    });
+  }
+
+  // Xóa domain riêng khi bấm dấu ×
+  if (customDomainList) {
+    customDomainList.addEventListener('click', e => {
+      if (e.target.classList.contains('domain-chip-remove')) {
+        const domain = e.target.getAttribute('data-domain');
+        if (domain && confirm(`Bỏ chặn tên miền '${domain}'?`)) {
+          webBlocker.removeCustomDomain(domain);
+          renderWebBlockerUI();
+        }
+      }
+    });
+  }
+
+  // Hộp thử nghiệm Tường lửa (Tester Sandbox)
+  if (btnTestUrl && inputTestUrl && testerResultBox) {
+    btnTestUrl.addEventListener('click', () => {
+      const url = inputTestUrl.value.trim();
+      if (!url) return;
+      const check = webBlocker.checkUrl(url);
+
+      if (check.isBlocked) {
+        testerResultBox.className = 'tester-result blocked';
+        testerResultBox.innerHTML = `
+          <strong>🚨 PHÁT HIỆN VI PHẠM - SẼ BỊ CHẶN NGAY LẬP TỨC:</strong><br>
+          • <strong>Phân loại:</strong> ${check.categoryName || check.category}<br>
+          • <strong>Lý do:</strong> ${check.reason}<br>
+          • <strong>Hành động:</strong> Hệ thống chuyển hướng máy con sang màn hình cảnh báo <code>blocked.html</code>.
+        `;
+        renderWebBlockerUI();
+      } else {
+        testerResultBox.className = 'tester-result safe';
+        testerResultBox.innerHTML = `
+          <strong>✓ TRANG AN TOÀN / HỢP LỆ:</strong><br>
+          Không phát hiện dấu hiệu lừa đảo, cờ bạc hay nội dung người lớn trên liên kết này.
+        `;
+      }
+    });
+  }
+
   // Khởi chạy hiển thị lần đầu
   renderDashboard();
+  renderWebBlockerUI();
 });
+
