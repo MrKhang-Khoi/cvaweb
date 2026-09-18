@@ -339,8 +339,29 @@
 
     .clock-right {
       color: var(--text-sub);
-      font-weight: 600;
+      font-weight: 700;
       font-variant-numeric: tabular-nums;
+      font-size: 0.86rem;
+      background: var(--bg);
+      border: 1px solid var(--card-border);
+      padding: 3px 8px;
+      border-radius: var(--radius-sm);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .clock-right:hover {
+      background: var(--primary-light);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .clock-right:active {
+      transform: scale(0.95);
     }
 
     /* ==========================================================================
@@ -1617,6 +1638,70 @@
       color: #15803d;
     }
 
+    /* QUICK TIMER CHIPS & ALARM STYLES */
+    .quick-timer-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+      margin-bottom: 12px;
+    }
+
+    .btn-timer-chip {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      font-size: 0.76rem;
+      font-weight: 700;
+      padding: 5px 10px;
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      user-select: none;
+    }
+
+    .btn-timer-chip:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .btn-timer-chip:active {
+      transform: scale(0.95);
+    }
+
+    .urgent-reminder-banner {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(239, 68, 68, 0.12));
+      border: 1.5px solid rgba(245, 158, 11, 0.45);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: 0 2px 8px rgba(245, 158, 11, 0.1);
+    }
+
+    .urgent-reminder-banner:active {
+      transform: scale(0.985);
+    }
+
+    @keyframes alarmPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+
+    .alarm-icon-anim {
+      display: inline-block;
+      animation: alarmPulse 1.2s infinite ease-in-out;
+    }
+
 
     /* ==========================================================================
        CATEGORY MANAGEMENT (QUẢN LÝ CÁC MỤC CHÍNH)
@@ -1960,7 +2045,23 @@
         <button id="btnInstallPwa" class="btn-install-pwa" title="Cài ứng dụng vào điện thoại để mở nhanh và dùng offline">
           <span>📲 Cài App</span>
         </button>
-        <div class="clock-right" id="miniClock">--:--</div>
+        <button type="button" class="clock-right" id="miniClock" title="⏰ Bấm để mở Lịch Nhắc Việc & Hẹn Giờ Sư Phạm">--:--</button>
+      </div>
+    </div>
+
+    <!-- BANNER NHẮC VIỆC CẦN LÀM (TỰ ĐỘNG BẬT KHI CÓ VIỆC SẮP ĐẾN HẠN / QUÁ HẠN) -->
+    <div id="urgentReminderBanner" class="urgent-reminder-banner" style="display: none;">
+      <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+        <span class="alarm-icon-anim" style="font-size: 1.2rem;">⏰</span>
+        <div style="min-width: 0;">
+          <div id="urgentBannerTitle" style="font-weight: 800; font-size: 0.88rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">--</div>
+          <div id="urgentBannerTime" style="font-size: 0.74rem; color: #d97706; font-weight: 700;">--</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+        <button type="button" id="btnUrgentBannerAction" class="btn-sheet-addon" style="height: 32px; padding: 0 10px; font-size: 0.78rem; font-weight: 700; color: #d97706; border-color: rgba(217, 119, 6, 0.4); background: var(--card-bg);">
+          Xem Ngay ↗
+        </button>
       </div>
     </div>
 
@@ -2497,16 +2598,34 @@
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
             <div class="f-group">
-              <label class="f-label" for="reminderDate">Ngày & Giờ đến hạn *</label>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <label class="f-label" for="reminderDate" style="margin-bottom: 0;">Ngày & Giờ đến hạn *</label>
+                <span id="draftSaveStatus" style="font-size: 0.72rem; color: #10b981; font-weight: 700; display: none;">✓ Đã tự lưu</span>
+              </div>
               <input type="datetime-local" id="reminderDate" class="f-input" required>
             </div>
             <div class="f-group">
               <label class="f-label" for="reminderRepeat">Lặp lại</label>
               <select id="reminderRepeat" class="f-select">
                 <option value="none">Không lặp lại</option>
+                <option value="daily">Hàng ngày</option>
                 <option value="weekly">Hàng tuần</option>
                 <option value="monthly">Hàng tháng</option>
               </select>
+            </div>
+          </div>
+
+          <!-- PHÍM HẸN GIỜ NHANH 1 CHẠM (ĐỒNG HỒ TỰ ĐỘNG CẬP NHẬT & LƯU NHÁP) -->
+          <div style="margin-top: 2px;">
+            <div style="font-size: 0.76rem; font-weight: 700; color: var(--text-mute); margin-bottom: 4px;">
+              ⏱️ Chọn nhanh giờ hẹn (Đồng hồ tự động lưu):
+            </div>
+            <div class="quick-timer-chips">
+              <button type="button" class="btn-timer-chip" data-timer-add="15">⚡ +15 phút</button>
+              <button type="button" class="btn-timer-chip" data-timer-add="60">⏱️ +1 tiếng</button>
+              <button type="button" class="btn-timer-chip" data-timer-preset="today_1700">🌆 Chiều nay 17:00</button>
+              <button type="button" class="btn-timer-chip" data-timer-preset="tomorrow_0730">🌅 Sáng mai 07:30</button>
+              <button type="button" class="btn-timer-chip" data-timer-preset="next_monday">📅 Thứ Hai tới</button>
             </div>
           </div>
 
@@ -2514,7 +2633,7 @@
             <button type="button" id="btnRequestNotification" class="btn-sheet-addon" style="height: 38px; font-size: 0.78rem;">
               🔔 Bật Thông Báo Hệ Thống
             </button>
-            <button type="submit" class="btn-action btn-action-primary" style="height: 38px; padding: 0 16px; font-size: 0.84rem;">
+            <button type="submit" id="btnSaveReminder" class="btn-action btn-action-primary" style="height: 38px; padding: 0 16px; font-size: 0.84rem;">
               + Thêm Lời Nhắc
             </button>
           </div>
@@ -2532,6 +2651,41 @@
           <button type="button" id="btnCloseReminderModal" class="btn-action btn-action-cancel" style="width: 100%;">Đóng Hộp Thoại</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL BÁO GIỜ NỔI BẬT: ALARM NOTIFICATION POPUP (TỰ ĐỘNG BẬT KÈM CHUÔNG KHI ĐẾN HẠN) -->
+  <div class="sheet-overlay" id="alarmNotificationModal" style="z-index: 300;">
+    <div class="sheet-panel" style="max-width: 440px; text-align: center; border: 2px solid #f59e0b; box-shadow: 0 20px 40px rgba(245, 158, 11, 0.25);">
+      <div class="sheet-head" style="justify-content: center; background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(239, 68, 68, 0.1)); border-bottom: 1px solid rgba(245, 158, 11, 0.25);">
+        <h3 class="sheet-title" style="color: #d97706; display: flex; align-items: center; gap: 8px;">
+          <span class="alarm-icon-anim" style="font-size: 1.3rem;">⏰</span>
+          <span>BÁO GIỜ: ĐẾN HẠN CÔNG VIỆC!</span>
+        </h3>
+      </div>
+      <div class="sheet-body" style="padding: 20px 16px 14px 16px;">
+        <div style="font-size: 2.8rem; margin-bottom: 8px; animation: alarmPulse 1.2s infinite ease-in-out;">🔔</div>
+        <div id="alarmModalDueTag" class="reminder-due-tag due-urgent" style="display: inline-block; margin-bottom: 10px; font-size: 0.8rem; padding: 4px 12px;">Đang đến hạn</div>
+        <h4 id="alarmModalTitle" style="font-size: 1.18rem; font-weight: 800; color: var(--text-main); margin-bottom: 8px; line-height: 1.35;">--</h4>
+        <div id="alarmModalSiteInfo" style="font-size: 0.84rem; color: var(--text-sub); margin-bottom: 18px;">--</div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <button type="button" id="btnAlarmOpenSite" class="btn-action btn-action-primary" style="width: 100%; height: 44px; font-weight: 800; font-size: 0.92rem;">
+            🌐 Mở Website Để Thực Hiện Ngay ↗
+          </button>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <button type="button" id="btnAlarmSnooze" class="btn-action" style="background: var(--card-bg); border: 1.5px solid var(--card-border); color: var(--text-main); height: 40px; font-size: 0.82rem; font-weight: 700;">
+              ⏱️ Báo lại sau 10p
+            </button>
+            <button type="button" id="btnAlarmMarkComplete" class="btn-action" style="background: #10b981; color: #ffffff; height: 40px; font-size: 0.82rem; font-weight: 700;">
+              ✓ Đã Hoàn Thành
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="sheet-foot">
+        <button type="button" id="btnCloseAlarmModal" class="btn-action btn-action-cancel" style="width: 100%;">Tắt Chuông Báo</button>
+      </div>
     </div>
   </div>
 
@@ -3134,7 +3288,7 @@
         }
       }
 
-      const DATA_VERSION = "1.8.0";
+      const DATA_VERSION = "1.9.0";
 
       async function initStorage() {
         try {
@@ -3948,12 +4102,13 @@
 
         return JSON.stringify({
           sync: "cva",
-          v: "1.8.0",
+          v: "1.9.0",
           co: catOrder,
           cc: customCats.length > 0 ? customCats : undefined,
           ld: linkDiffs.length > 0 ? linkDiffs : undefined,
           cl: customLinks.length > 0 ? customLinks : undefined,
-          lo: linksData.map(l => l.id)
+          lo: linksData.map(l => l.id),
+          rem: remindersData
         });
       }
 
@@ -4030,12 +4185,29 @@
             count++;
           }
 
+          if (Array.isArray(imported.rem) && imported.rem.length > 0) {
+            remindersData = imported.rem;
+            saveRemindersStorage();
+            updateReminderBadge();
+            renderReminderList();
+            if (typeof updateUrgentBanner === "function") updateUrgentBanner();
+            count++;
+          }
+
           saveToStorage();
           renderItems();
           return count > 0;
         }
 
-        // Định dạng 2: File backup đầy đủ { cat, links }
+        // Định dạng 2: File backup đầy đủ { cat, links, reminders }
+        if (Array.isArray(imported.reminders) && imported.reminders.length > 0) {
+          remindersData = imported.reminders;
+          saveRemindersStorage();
+          updateReminderBadge();
+          renderReminderList();
+          if (typeof updateUrgentBanner === "function") updateUrgentBanner();
+          count++;
+        }
         if (imported.cat && Array.isArray(imported.cat) && imported.cat.length > 0) {
           categoriesData = imported.cat;
           saveCategoriesStorage();
@@ -4131,10 +4303,11 @@
           try {
             const fullBundle = {
               app: "Cổng Website Giáo Viên",
-              version: "1.5.0",
+              version: "1.9.0",
               exportedAt: new Date().toISOString(),
               categories: categoriesData,
-              links: linksData
+              links: linksData,
+              reminders: remindersData
             };
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullBundle, null, 2));
             const dl = document.createElement("a");
@@ -4171,12 +4344,13 @@
         btnExportGitHubConfig.addEventListener("click", () => {
           const exportData = {
             categories: categoriesData,
-            links: linksData
+            links: linksData,
+            reminders: remindersData
           };
           const jsonStr = JSON.stringify(exportData, null, 2);
           if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(jsonStr).then(() => {
-              alert("👑 ĐÃ SAO CHÉP CẤU HÌNH ĐỒNG BỘ!\n\nThầy/Cô đã sao chép toàn bộ dữ liệu Danh mục và " + linksData.length + " website vào bộ nhớ tạm (Clipboard).\n\nThầy/Cô chỉ cần dán (Ctrl+V) gửi cho Antigravity hoặc lập trình viên để cập nhật lên GitHub repository, tất cả giáo viên toàn trường sẽ nhận được bản mới tức thì!");
+              alert("👑 ĐÃ SAO CHÉP CẤU HÌNH ĐỒNG BỘ!\n\nThầy/Cô đã sao chép toàn bộ dữ liệu Danh mục, Lời nhắc và " + linksData.length + " website vào bộ nhớ tạm (Clipboard).\n\nThầy/Cô chỉ cần dán (Ctrl+V) gửi cho Antigravity hoặc lập trình viên để cập nhật lên GitHub repository, tất cả giáo viên toàn trường sẽ nhận được bản mới tức thì!");
             }).catch(() => {
               prompt("Sao chép mã JSON này gửi lên GitHub:", jsonStr);
             });
@@ -4227,6 +4401,14 @@
                 saveCategoriesStorage();
                 updateCategoryDropdowns();
                 renderCategoryTabs();
+              }
+              // Nếu file có chứa reminders
+              if (parsed.reminders && Array.isArray(parsed.reminders)) {
+                remindersData = parsed.reminders;
+                saveRemindersStorage();
+                renderReminderList();
+                updateReminderBadge();
+                if (typeof updateUrgentBanner === "function") updateUrgentBanner();
               }
               // Nếu file có chứa links
               const importedLinks = Array.isArray(parsed) ? parsed : (parsed.links || []);
@@ -5660,7 +5842,7 @@
       updateOnlineStatus();
 
       // ==========================================================================
-      // 19. TÍNH NĂNG NHẮC NHỞ CÔNG VIỆC GIÁO VIÊN (REMINDERS & TASKS)
+      // 19. TÍNH NĂNG NHẮC NHỞ CÔNG VIỆC GIÁO VIÊN & ĐỒNG HỒ TỰ ĐỘNG LƯU (REMINDERS & CLOCK)
       // ==========================================================================
       let remindersData = [];
       const reminderModal = document.getElementById("reminderModal");
@@ -5676,6 +5858,120 @@
       const reminderListContainer = document.getElementById("reminderListContainer");
       const reminderCountLabel = document.getElementById("reminderCountLabel");
       const btnRequestNotification = document.getElementById("btnRequestNotification");
+      const draftSaveStatus = document.getElementById("draftSaveStatus");
+
+      // MODAL BÁO THỨC ALARM IN-APP
+      let currentAlarmItem = null;
+      const alarmNotificationModal = document.getElementById("alarmNotificationModal");
+      const alarmModalTitle = document.getElementById("alarmModalTitle");
+      const alarmModalSiteInfo = document.getElementById("alarmModalSiteInfo");
+      const btnAlarmOpenSite = document.getElementById("btnAlarmOpenSite");
+      const btnAlarmSnooze = document.getElementById("btnAlarmSnooze");
+      const btnAlarmMarkComplete = document.getElementById("btnAlarmMarkComplete");
+      const btnCloseAlarmModal = document.getElementById("btnCloseAlarmModal");
+
+      // HÀM ĐỊNH DẠNG GIỜ ĐỊA PHƯƠNG CHUẨN (KHẮC PHỤC LỖI UTC LỆCH 7 TIẾNG)
+      function toLocalDatetimeString(date) {
+        const d = date || new Date();
+        const pad = num => String(num).padStart(2, "0");
+        const YYYY = d.getFullYear();
+        const MM = pad(d.getMonth() + 1);
+        const DD = pad(d.getDate());
+        const HH = pad(d.getHours());
+        const mm = pad(d.getMinutes());
+        return `${YYYY}-${MM}-${DD}T${HH}:${mm}`;
+      }
+
+      // HÀM TỰ ĐỘNG LƯU NHÁP FORM HẸN GIỜ (AUTO-SAVE CLOCK & REMINDER DRAFT)
+      function saveReminderDraft() {
+        try {
+          const draft = {
+            title: reminderTitle ? reminderTitle.value : "",
+            due: reminderDate ? reminderDate.value : "",
+            webId: reminderLinkedWeb ? reminderLinkedWeb.value : "",
+            repeat: reminderRepeat ? reminderRepeat.value : "none"
+          };
+          localStorage.setItem("teacher_hub_reminder_draft_v1", JSON.stringify(draft));
+          if (draftSaveStatus) {
+            draftSaveStatus.style.display = "inline";
+            setTimeout(() => { if (draftSaveStatus) draftSaveStatus.style.display = "none"; }, 1400);
+          }
+        } catch(e) {}
+      }
+
+      function restoreReminderDraft() {
+        try {
+          const saved = localStorage.getItem("teacher_hub_reminder_draft_v1");
+          if (saved) {
+            const draft = JSON.parse(saved);
+            if (reminderTitle && draft.title) reminderTitle.value = draft.title;
+            if (reminderLinkedWeb && draft.webId) reminderLinkedWeb.value = draft.webId;
+            if (reminderRepeat && draft.repeat) reminderRepeat.value = draft.repeat;
+            if (reminderDate && draft.due) {
+              reminderDate.value = draft.due;
+              return;
+            }
+          }
+        } catch(e) {}
+
+        // Mặc định chuẩn: Ngày mai lúc 17:00 theo giờ địa phương Việt Nam (GMT+7)
+        const defaultDue = new Date();
+        defaultDue.setDate(defaultDue.getDate() + 1);
+        defaultDue.setHours(17, 0, 0, 0);
+        if (reminderDate) reminderDate.value = toLocalDatetimeString(defaultDue);
+      }
+
+      // TỰ ĐỘNG LƯU KHI NGƯỜI DÙNG NHẬP LIỆU HOẶC CHỈNH GIỜ
+      if (reminderTitle) {
+        reminderTitle.addEventListener("input", saveReminderDraft);
+      }
+      if (reminderDate) {
+        reminderDate.addEventListener("input", saveReminderDraft);
+        reminderDate.addEventListener("change", saveReminderDraft);
+      }
+      if (reminderLinkedWeb) {
+        reminderLinkedWeb.addEventListener("change", saveReminderDraft);
+      }
+      if (reminderRepeat) {
+        reminderRepeat.addEventListener("change", saveReminderDraft);
+      }
+
+      // PHÍM HẸN GIỜ NHANH 1 CHẠM (QUICK TIMER CHIPS)
+      document.querySelectorAll(".btn-timer-chip").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const addMins = btn.getAttribute("data-timer-add");
+          const preset = btn.getAttribute("data-timer-preset");
+          const now = new Date();
+          let target = new Date();
+
+          if (addMins) {
+            target = new Date(now.getTime() + parseInt(addMins, 10) * 60 * 1000);
+          } else if (preset === "today_1700") {
+            target.setHours(17, 0, 0, 0);
+            if (target <= now) target.setDate(target.getDate() + 1);
+          } else if (preset === "tomorrow_0730") {
+            target.setDate(target.getDate() + 1);
+            target.setHours(7, 30, 0, 0);
+          } else if (preset === "next_monday") {
+            const day = target.getDay();
+            const diff = (8 - day) % 7 || 7;
+            target.setDate(target.getDate() + diff);
+            target.setHours(7, 30, 0, 0);
+          }
+
+          if (reminderDate) {
+            reminderDate.value = toLocalDatetimeString(target);
+            saveReminderDraft();
+            showToast(`⏱️ Đã hẹn giờ: ${target.toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'})} ngày ${target.toLocaleDateString('vi-VN', {day: '2-digit', month: '2-digit'})}`);
+          }
+        });
+      });
+
+      // KẾT NỐI ĐỒNG HỒ TRÊN HEADER/GREETING CHIP VỚI HỘP THOẠI NHẮC VIỆC
+      const miniClock = document.getElementById("miniClock");
+      if (miniClock) {
+        miniClock.addEventListener("click", openReminderModal);
+      }
 
       function initReminders() {
         try {
@@ -5685,7 +5981,7 @@
           remindersData = [];
         }
 
-        // Tự động tạo một số lời nhắc sư phạm mẫu nếu danh sách trống
+        // Tự động tạo lời nhắc sư phạm mẫu nếu danh sách trống
         if (remindersData.length === 0) {
           const tom = new Date();
           tom.setDate(tom.getDate() + 2);
@@ -5705,6 +6001,7 @@
         }
 
         updateReminderBadge();
+        updateUrgentBanner();
         checkDueReminders();
       }
 
@@ -5734,18 +6031,15 @@
             linksData.map(l => `<option value="${l.id}">🌐 ${escapeHtml(l.title)}</option>`).join("");
         }
 
-        // Mặc định ngày mai lúc 17:00
-        const defaultDue = new Date();
-        defaultDue.setDate(defaultDue.getDate() + 1);
-        defaultDue.setHours(17, 0, 0, 0);
-        reminderDate.value = defaultDue.toISOString().slice(0, 16);
+        // Khôi phục nháp giờ hẹn hoặc gán mặc định địa phương
+        restoreReminderDraft();
 
         renderReminderList();
-        reminderModal.classList.add("active");
+        if (reminderModal) reminderModal.classList.add("active");
       }
 
       function closeReminderModal() {
-        reminderModal.classList.remove("active");
+        if (reminderModal) reminderModal.classList.remove("active");
       }
 
       if (phoneReminderBtn) phoneReminderBtn.addEventListener("click", openReminderModal);
@@ -5757,7 +6051,7 @@
         });
       }
 
-      // Yêu cầu quyền thông báo của trình duyệt
+      // YÊU CẦU QUYỀN THÔNG BÁO HỆ THỐNG
       if (btnRequestNotification) {
         btnRequestNotification.addEventListener("click", () => {
           if (!("Notification" in window)) {
@@ -5777,15 +6071,19 @@
         });
       }
 
+      // THÊM LỜI NHẮC MỚI VÀ TỰ ĐỘNG LƯU
       if (reminderForm) {
         reminderForm.addEventListener("submit", (e) => {
           e.preventDefault();
-          const title = reminderTitle.value.trim();
-          const due = reminderDate.value;
-          const webId = reminderLinkedWeb.value;
-          const repeat = reminderRepeat.value;
+          const title = reminderTitle ? reminderTitle.value.trim() : "";
+          const due = reminderDate ? reminderDate.value : "";
+          const webId = reminderLinkedWeb ? reminderLinkedWeb.value : "";
+          const repeat = reminderRepeat ? reminderRepeat.value : "none";
 
-          if (!title || !due) return;
+          if (!title || !due) {
+            showToast("Vui lòng nhập nội dung và chọn giờ hẹn", "error");
+            return;
+          }
 
           remindersData.unshift({
             id: "rem-" + Date.now(),
@@ -5793,14 +6091,19 @@
             webId,
             dueDate: new Date(due).toISOString(),
             repeat,
-            completed: false
+            completed: false,
+            notified: false
           });
 
           saveRemindersStorage();
-          reminderTitle.value = "";
+          if (reminderTitle) reminderTitle.value = "";
+          // Xóa draft sau khi đã thêm thành công
+          try { localStorage.removeItem("teacher_hub_reminder_draft_v1"); } catch(e) {}
+
           renderReminderList();
           updateReminderBadge();
-          showToast("⏰ Đã thêm lời nhắc công việc!");
+          updateUrgentBanner();
+          showToast("⏰ Đã thêm lời nhắc & lưu đồng hồ thành công!");
         });
       }
 
@@ -5852,7 +6155,7 @@
               <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
                 <div style="font-size: 0.76rem; color: var(--text-mute);">
                   ${linkedSite ? `🌐 ${escapeHtml(linkedSite.title)}` : '📌 Việc chung'}
-                  ${item.repeat !== 'none' ? ' (Lặp: ' + item.repeat + ')' : ''}
+                  ${item.repeat && item.repeat !== 'none' ? ' (Lặp: ' + item.repeat + ')' : ''}
                 </div>
                 <div style="display: flex; gap: 4px;">
                   ${linkedSite ? `
@@ -5870,16 +6173,184 @@
         }).join("");
       }
 
+      // PHÁT HỢP ÂM CHUÔNG BÁO SƯ PHẠM (WEB AUDIO API - 100% OFFLINE)
+      function playAlarmChime() {
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return;
+          const ctx = new AudioCtx();
+          if (ctx.state === "suspended") ctx.resume();
+          const now = ctx.currentTime;
+          
+          // Nốt 1 (C5 - 523.25Hz)
+          const osc1 = ctx.createOscillator();
+          const gain1 = ctx.createGain();
+          osc1.type = "sine";
+          osc1.frequency.setValueAtTime(523.25, now);
+          gain1.gain.setValueAtTime(0.3, now);
+          gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+          osc1.connect(gain1);
+          gain1.connect(ctx.destination);
+          osc1.start(now);
+          osc1.stop(now + 0.4);
+
+          // Nốt 2 (E5 - 659.25Hz)
+          const osc2 = ctx.createOscillator();
+          const gain2 = ctx.createGain();
+          osc2.type = "sine";
+          osc2.frequency.setValueAtTime(659.25, now + 0.18);
+          gain2.gain.setValueAtTime(0.35, now + 0.18);
+          gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+          osc2.connect(gain2);
+          gain2.connect(ctx.destination);
+          osc2.start(now + 0.18);
+          osc2.stop(now + 0.65);
+
+          // Nốt 3 (G5 - 783.99Hz)
+          const osc3 = ctx.createOscillator();
+          const gain3 = ctx.createGain();
+          osc3.type = "sine";
+          osc3.frequency.setValueAtTime(783.99, now + 0.36);
+          gain3.gain.setValueAtTime(0.4, now + 0.36);
+          gain3.gain.exponentialRampToValueAtTime(0.001, now + 1.1);
+          osc3.connect(gain3);
+          gain3.connect(ctx.destination);
+          osc3.start(now + 0.36);
+          osc3.stop(now + 1.1);
+
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
+        } catch(e) {}
+      }
+
+      // BẬT CỬA SỔ BÁO GIỜ NỔI BẬT TRONG WEB (IN-APP ALARM MODAL)
+      function showAlarmModal(item) {
+        if (!alarmNotificationModal || !item) return;
+        currentAlarmItem = item;
+        if (alarmModalTitle) alarmModalTitle.textContent = item.title;
+        const linkedSite = linksData.find(x => x.id === item.webId);
+        if (alarmModalSiteInfo) {
+          alarmModalSiteInfo.textContent = linkedSite ? `🌐 Website gắn kèm: ${linkedSite.title} (${cleanUrl(linkedSite.url)})` : "📌 Nhiệm vụ sư phạm của Thầy/Cô";
+        }
+        if (btnAlarmOpenSite) {
+          btnAlarmOpenSite.style.display = linkedSite ? "block" : "none";
+          btnAlarmOpenSite.onclick = () => {
+            closeAlarmModal();
+            if (linkedSite) window.teacherPortal.openDirectWithPass(linkedSite.id);
+          };
+        }
+        playAlarmChime();
+        alarmNotificationModal.classList.add("active");
+      }
+
+      function closeAlarmModal() {
+        if (alarmNotificationModal) alarmNotificationModal.classList.remove("active");
+        currentAlarmItem = null;
+      }
+      if (btnCloseAlarmModal) btnCloseAlarmModal.addEventListener("click", closeAlarmModal);
+
+      if (btnAlarmSnooze) {
+        btnAlarmSnooze.addEventListener("click", () => {
+          if (currentAlarmItem) {
+            // Hoãn lại 10 phút
+            const newDue = new Date(Date.now() + 10 * 60 * 1000);
+            currentAlarmItem.dueDate = newDue.toISOString();
+            currentAlarmItem.notified = false;
+            saveRemindersStorage();
+            renderReminderList();
+            updateReminderBadge();
+            updateUrgentBanner();
+            showToast("⏱️ Đã hoãn nhắc việc thêm 10 phút!");
+          }
+          closeAlarmModal();
+        });
+      }
+
+      if (btnAlarmMarkComplete) {
+        btnAlarmMarkComplete.addEventListener("click", () => {
+          if (currentAlarmItem) {
+            currentAlarmItem.completed = true;
+            saveRemindersStorage();
+            renderReminderList();
+            updateReminderBadge();
+            updateUrgentBanner();
+            showToast("🎉 Chúc mừng Thầy/Cô đã hoàn thành công việc!");
+          }
+          closeAlarmModal();
+        });
+      }
+
+      // CẬP NHẬT BANNER NHẮC VIỆC TRÊN TRANG CHỦ
+      function updateUrgentBanner() {
+        const banner = document.getElementById("urgentReminderBanner");
+        const bTitle = document.getElementById("urgentBannerTitle");
+        const bTime = document.getElementById("urgentBannerTime");
+        const bAction = document.getElementById("btnUrgentBannerAction");
+        if (!banner) return;
+
+        const now = new Date();
+        const activeList = remindersData
+          .filter(r => !r.completed)
+          .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
+        if (activeList.length === 0) {
+          banner.style.display = "none";
+          return;
+        }
+
+        const topItem = activeList[0];
+        const dueDate = new Date(topItem.dueDate);
+        const diffMs = dueDate - now;
+
+        // Hiển thị nếu: Đã quá hạn HOẶC sẽ đến hạn trong vòng 24 giờ
+        if (diffMs <= 24 * 60 * 60 * 1000) {
+          banner.style.display = "flex";
+          if (bTitle) bTitle.textContent = topItem.title;
+          if (bTime) {
+            if (diffMs < 0) {
+              const overdueMins = Math.abs(Math.round(diffMs / (60 * 1000)));
+              bTime.textContent = overdueMins > 60 
+                ? `⚠️ Đã quá hạn ${Math.round(overdueMins / 60)} giờ!`
+                : `⚠️ Đã quá hạn ${overdueMins} phút!`;
+              bTime.style.color = "#ef4444";
+            } else {
+              bTime.textContent = `⏰ Hôm nay lúc ${dueDate.toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'})}`;
+              bTime.style.color = "#d97706";
+            }
+          }
+          banner.onclick = (e) => {
+            if (e.target === bAction || bAction.contains(e.target)) {
+              const linkedSite = linksData.find(x => x.id === topItem.webId);
+              if (linkedSite) {
+                window.teacherPortal.openDirectWithPass(linkedSite.id);
+                return;
+              }
+            }
+            openReminderModal();
+          };
+        } else {
+          banner.style.display = "none";
+        }
+      }
+
+      // KIỂM TRA ĐẾN HẠN ĐỊNH KỲ (KHÔNG BAO GIỜ BỎ LỠ)
       function checkDueReminders() {
         const now = new Date();
+        updateUrgentBanner();
+
         remindersData.forEach(item => {
           if (item.completed) return;
           const due = new Date(item.dueDate);
-          // Nếu trong vòng 10 phút trước hoặc sau
-          if (Math.abs(due - now) <= 10 * 60 * 1000 && !item.notified) {
+          const diffMs = due - now;
+
+          // Nếu đến hạn hoặc đã quá hạn trong vòng 24 giờ mà chưa báo
+          if (diffMs <= 0 && Math.abs(diffMs) <= 24 * 60 * 60 * 1000 && !item.notified) {
             item.notified = true;
             saveRemindersStorage();
 
+            // 1. Kích hoạt In-App Alarm Popup kèm chuông âm thanh
+            showAlarmModal(item);
+
+            // 2. Kích hoạt Web Notification nếu có quyền
             if ("Notification" in window && Notification.permission === "granted") {
               const linkedSite = linksData.find(x => x.id === item.webId);
               new Notification("⏰ Đến hạn: " + item.title, {
@@ -5892,7 +6363,7 @@
         });
       }
 
-      setInterval(checkDueReminders, 60000);
+      setInterval(checkDueReminders, 30000);
 
       // Thêm hàm vào window.teacherPortal
       window.teacherPortal.toggleReminder = function(id) {
@@ -5902,6 +6373,7 @@
           saveRemindersStorage();
           renderReminderList();
           updateReminderBadge();
+          updateUrgentBanner();
         }
       };
 
@@ -5910,8 +6382,12 @@
         saveRemindersStorage();
         renderReminderList();
         updateReminderBadge();
+        updateUrgentBanner();
         showToast("Đã xóa lời nhắc");
       };
+
+      window.teacherPortal.checkDueReminders = checkDueReminders;
+      window.teacherPortal.showAlarmModal = showAlarmModal;
 
       initReminders();
 
