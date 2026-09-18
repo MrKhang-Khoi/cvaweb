@@ -46,12 +46,12 @@ const WEB_FILTER_CATEGORIES = {
     severity: 'danger',
     description: 'Ngăn chặn hiểm họa nợ nần, cờ bạc phi pháp xâm nhập học đường',
     domains: [
-      'sunwin.fun', 'go88.info', 'ku777.me', 'kubet.com', 'thabet.gg',
+      'sunwin.fun', 'go88.info', 'ku777.me', 'kubet.com', 'kubet77.com', 'thabet.gg',
       'b52.club', 'rikvip.club', 'w88.com', 'fun88.com', 'm88.com',
       'taixiuonline.com', 'nohu88.club', 'ban-ca-doi-thuong.com'
     ],
     urlKeywords: [
-      'tai-xiu-online', 'taixiu', 'danh-bai-doi-thuong', 'nohu', 'no-hu',
+      'tai-xiu-online', 'taixiu', 'danh-bai-doi-thuong', 'nohu', 'no-hu', 'kubet',
       'ca-do-bong-da', 'baccarat-online', 'game-bai-doi-thuong', 'quay-hu'
     ]
   },
