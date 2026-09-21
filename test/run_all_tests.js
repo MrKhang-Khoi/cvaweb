@@ -126,6 +126,16 @@ assert(htmlContent.includes('function saveCategoriesStorage') && htmlContent.inc
 assert(htmlContent.includes('@media (max-width: 767.98px)') && htmlContent.includes('display: flex !important;'), 'Đảm bảo Bottom Dock hiển thị cố định trên mobile, không bị display: none ghi đè');
 assert(!htmlContent.includes('window.location.reload();') || htmlContent.includes('if (updateApproved && !isRefreshing)'), 'Nút Cập Nhật Ngay không reload trực tiếp, chuyển hoàn toàn cho controllerchange kiểm soát');
 
+// 8. KIỂM THỬ PLAYWRIGHT E2E TRÌNH DUYỆT THẬT (DUAL ENVIRONMENT: FILE:/// VÀ HTTP://LOCALHOST)
+console.log('\n📌 8. Kiểm thử Playwright E2E Thực tế trên Trình duyệt kép:');
+try {
+  const e2eScript = path.join(__dirname, 'test_browser_e2e.js');
+  execSync(`node "${e2eScript}"`, { stdio: 'inherit' });
+  assert(true, 'Kiểm thử Playwright E2E: PASS 100% (0 console errors, render đủ 18 website trên cả file:/// và HTTP)');
+} catch(err) {
+  assert(false, `Lỗi kiểm thử Playwright E2E: ${err.message}`);
+}
+
 
 console.log('\n═══════════════════════════════════════════════════════════════');
 console.log(`📊 TỔNG KẾT KIỂM THỬ: ${passCount} PASS, ${failCount} FAIL`);

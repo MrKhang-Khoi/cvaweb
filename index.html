@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
   <meta name="theme-color" content="#2563eb">
-    <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
   <link rel="icon" type="image/png" href="./icons/icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -3175,8 +3174,15 @@
       "use strict";
 
       // ==========================================================================
-      // 0. BẢO VỆ CONSOLE: Ngăn chặn cảnh báo lỗi từ Extension của trình duyệt
+      // 0. BẢO VỆ MÔI TRƯỜNG & CONSOLE: PWA Manifest & Tránh lỗi CORS Sandbox
       // ==========================================================================
+      if (window.location.protocol !== "file:") {
+        const manifestLink = document.createElement("link");
+        manifestLink.rel = "manifest";
+        manifestLink.href = "./manifest.json";
+        document.head.appendChild(manifestLink);
+      }
+
       window.addEventListener("unhandledrejection", function(event) {
         if (event.reason && typeof event.reason.message === "string") {
           if (event.reason.message.includes("message channel closed") || 
@@ -3646,7 +3652,7 @@
         const container = document.getElementById("catScrollTrack");
         if (!container) return;
 
-        /* sanitize */  categoriesData.map(cat => {
+        /* sanitize */ container.innerHTML = categoriesData.map(cat => {
           const isActive = cat.id === currentCategory ? "active" : "";
           return `<button class="category-pill ${isActive}" data-cat="${cat.id}">
             <span>${escapeHtml(cat.icon || '📁')}</span>
@@ -3667,7 +3673,7 @@
       function updateCategoryDropdowns() {
         const sel = document.getElementById("sheetCategory");
         if (sel) {
-          /* sanitize */  categoriesData
+          /* sanitize */ sel.innerHTML = categoriesData
             .filter(c => c.id !== "all" && c.id !== "fav")
             .map(c => `<option value="${c.id}">${escapeHtml(c.icon || '📁')} ${escapeHtml(c.label)}</option>`)
             .join("");
@@ -3725,7 +3731,7 @@
 
         if (filtered.length === 0) {
           container.className = "";
-          /* sanitize */  `
+          /* sanitize */ container.innerHTML = `
             <div class="no-results">
               <p>🔍 Không tìm thấy trang web phù hợp</p>
               <button class="btn-action btn-action-primary" style="margin-top: 12px;" id="btnEmptyAddWeb">
@@ -3740,7 +3746,7 @@
 
         if (viewMode === "grid") {
           container.className = "item-grid" + (isEditMode ? " is-editing" : "");
-          /* sanitize */  filtered.map(item => {
+          /* sanitize */ container.innerHTML = filtered.map(item => {
             const favClass = item.isFavorite ? "fav-active" : "";
             const catObj = categoriesData.find(c => c.id === item.category) || { label: item.category };
             const iconChar = escapeHtml(item.iconChar || (item.title ? item.title.substring(0, 2).toUpperCase() : "WB"));
@@ -3796,7 +3802,7 @@
         } else {
           // List mode
           container.className = "item-list" + (isEditMode ? " is-editing" : "");
-          /* sanitize */  filtered.map(item => {
+          /* sanitize */ container.innerHTML = filtered.map(item => {
             const favClass = item.isFavorite ? "fav-active" : "";
             const displayUrl = cleanUrl(item.url);
             const iconChar = escapeHtml(item.iconChar || (item.title ? item.title.substring(0, 2).toUpperCase() : "WB"));
@@ -3975,7 +3981,7 @@
         const list = document.getElementById("swatchList");
         if (!list) return;
         const current = sheetColor.value;
-        /* sanitize */  COLOR_PALETTE.map(c => {
+        /* sanitize */ list.innerHTML = COLOR_PALETTE.map(c => {
           const isAct = c.toLowerCase() === current.toLowerCase() ? "active" : "";
           return `<div class="swatch-dot ${isAct}" style="background-color: ${c};" data-color="${c}"></div>`;
         }).join("");
@@ -5106,7 +5112,7 @@
         });
 
         if (entries.length === 0) {
-          /* sanitize */  `
+          /* sanitize */ allVaultListContainer.innerHTML = `
             <div style="text-align: center; padding: 28px 12px; color: var(--text-mute); font-size: 0.88rem;">
               <p>📭 Chưa có tài khoản nào được lưu.</p>
               <p style="margin-top: 4px; font-size: 0.78rem;">Bấm biểu tượng 🔑 trên từng thẻ website để lưu tài khoản của Thầy/Cô.</p>
@@ -5116,7 +5122,7 @@
         }
 
         // Render an toàn 100% không chứa dữ liệu nhạy cảm trong inline event handlers
-        /* sanitize */  entries.map(({ linkId, link, cred }) => {
+        /* sanitize */ allVaultListContainer.innerHTML = entries.map(({ linkId, link, cred }) => {
           return `
             <div class="vault-card-row">
               <div class="vault-card-row-head">
@@ -5308,7 +5314,7 @@
       function openQrStudio(linkId) {
         // Cho phép toàn bộ giáo viên sử dụng tiện ích tạo mã QR phục vụ giảng dạy
         if (qrSelectWeb) {
-          /* sanitize */  `
+          /* sanitize */ qrSelectWeb.innerHTML = `
             <option value="custom">-- Nhập đường link tùy ý --</option>
             ${linksData.map(l => `<option value="${l.id}">${escapeHtml(l.title)} (${escapeHtml(cleanUrl(l.url))})</option>`).join("")}
           `;
@@ -5607,7 +5613,7 @@
 
       function renderCategoryManageList() {
         if (!categoryListContainer) return;
-        /* sanitize */  categoriesData.map((cat, idx) => {
+        /* sanitize */ categoryListContainer.innerHTML = categoriesData.map((cat, idx) => {
           const isSys = cat.system || cat.id === "all" || cat.id === "fav";
           return `
             <div class="cat-item-row">
@@ -5775,6 +5781,10 @@
 
       if (btnCheckAppUpdateNow) {
         btnCheckAppUpdateNow.addEventListener("click", async () => {
+          if (window.location.protocol === "file:") {
+            showToast("💡 Thầy/Cô đang mở tệp trực tiếp (file:///). Hãy mở qua máy chủ hoặc website để kiểm tra cập nhật tự động!", "info");
+            return;
+          }
           if (!navigator.onLine) {
             showToast("📶 Đang ở chế độ ngoại tuyến, không thể kiểm tra bản cập nhật mới.", "warning");
             return;
@@ -5801,7 +5811,8 @@
         });
       }
 
-      if ("serviceWorker" in navigator) {
+      const isFileProtocol = window.location.protocol === "file:";
+      if ("serviceWorker" in navigator && !isFileProtocol) {
         // Chỉ reload khi người dùng đã chủ động bấm chấp thuận cập nhật (updateApproved === true)
         navigator.serviceWorker.addEventListener("controllerchange", () => {
           if (updateApproved && !isRefreshing) {
@@ -5834,6 +5845,8 @@
             console.warn("[ServiceWorker] Lỗi đăng ký:", err);
           });
         });
+      } else if (isFileProtocol) {
+        console.info("💡 [Chế độ cục bộ] Thầy/Cô đang mở trực tiếp tệp HTML (file:///). Tất cả 18 website, Sổ tay mật khẩu, Báo thức và Thời khóa biểu đều hoạt động 100%. PWA Service Worker sẽ tự động kích hoạt khi mở qua máy chủ hoặc website.");
       }
 
       // ==========================================================================
@@ -5923,7 +5936,7 @@
 
       function openReminderModal() {
         if (reminderLinkedWeb) {
-          /* sanitize */  '<option value="">-- Không gắn trang web --</option>' +
+          /* sanitize */ reminderLinkedWeb.innerHTML = '<option value="">-- Không gắn trang web --</option>' +
             linksData.map(l => `<option value="${l.id}">🌐 ${escapeHtml(l.title)}</option>`).join("");
         }
         if (reminderDate && !reminderDate.value) {
@@ -5999,7 +6012,7 @@
         if (reminderCountLabel) reminderCountLabel.textContent = `${remindersData.length} lời nhắc`;
 
         if (remindersData.length === 0) {
-          /* sanitize */  `
+          /* sanitize */ reminderListContainer.innerHTML = `
             <div style="text-align: center; padding: 24px 8px; color: var(--text-mute); font-size: 0.86rem;">
               <p>📭 Chưa có lời nhắc nào được tạo.</p>
             </div>
@@ -6007,7 +6020,7 @@
           return;
         }
 
-        /* sanitize */  remindersData.map(item => {
+        /* sanitize */ reminderListContainer.innerHTML = remindersData.map(item => {
           const linkedSite = linksData.find(x => x.id === item.webId);
           const d = new Date(item.dueDate);
           const timeStr = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + d.toLocaleDateString('vi-VN');
@@ -6299,7 +6312,7 @@
       function renderTimetableDay(dayNum) {
         if (!periodListContainer) return;
         const dayData = teacherTimetableData[dayNum] || {};
-        /* sanitize */  BELL_SCHEDULE.filter(b => !b.isRecess).map(b => {
+        /* sanitize */ periodListContainer.innerHTML = BELL_SCHEDULE.filter(b => !b.isRecess).map(b => {
           const val = dayData[b.name] || "";
           return `
             <div style="display: flex; align-items: center; gap: 8px; background: var(--bg); padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--card-border);">
@@ -6483,7 +6496,7 @@
 
       function openBatchQrModal() {
         if (!batchQrSelectList) return;
-        /* sanitize */  linksData.map(l => `
+        /* sanitize */ batchQrSelectList.innerHTML = linksData.map(l => `
           <label style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">
             <input type="checkbox" value="${l.id}" checked style="transform: scale(1.15);">
             <span>${escapeHtml(l.title)} (${escapeHtml(cleanUrl(l.url))})</span>
