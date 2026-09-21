@@ -52,3 +52,30 @@
    - Đồng hồ đếm ngược làm bài / thi đua nhóm.
 3. **Đồng bộ Đám mây Cá nhân (Cloud Backup)**: Cho phép giáo viên sao lưu mã hóa vào Google Drive / OneDrive hoặc sao lưu file bảo vệ bằng mật khẩu.
 4. **Xuất thẻ QR Học liệu & Bảng dán lớp**: Xuất hàng loạt thẻ QR cho học sinh quét nộp bài tập, tài liệu học tập.
+
+---
+
+## 6. QUY CHUẨN CẬP NHẬT ỨNG DỤNG & ĐỒNG BỘ ĐA THIẾT BỊ (UPDATE & SYNC LIFECYCLE)
+1. **Quy trình Cập nhật PWA An toàn (Zero-Data-Loss PWA Update)**:
+   - Nghiêm cấm cưỡng chế tự động reload trang (`window.location.reload()`) khi chưa có sự đồng ý của người dùng, tránh làm mất dữ liệu giáo viên đang nhập dở.
+   - Bắt buộc kiểm tra `reg.waiting` ngay khi khởi tạo và lắng nghe `reg.onupdatefound` -> `installingWorker.onstatechange === 'installed'`.
+   - Hiển thị banner cập nhật (`pwaUpdateBanner`) không che khuất thanh điều hướng di động, kèm 2 tùy chọn: "🚀 Cập Nhật Ngay" và "✕ Để sau".
+   - Kích hoạt `skipWaiting` an toàn và đồng bộ tải lại qua sự kiện `navigator.serviceWorker.controllerchange` với cờ chặn `isRefreshing` chống reload lặp vô hạn.
+   - Nút "🔄 Kiểm Tra Cập Nhật" (`btnCheckAppUpdateNow`) phải kích hoạt `reg.update()`, phản hồi trạng thái mạng và phiên bản tức thì.
+2. **Đồng bộ Đầy đủ Dữ liệu giữa Điện thoại & Máy tính (Multi-Device Full Sync)**:
+   - Dữ liệu đồng bộ (QR Sync và Backup JSON) phải có `schemaVersion: 2` và chứa toàn bộ: `categories`, `links`, `reminders`, và `timetable: teacherTimetableData`.
+   - **Xác thực Bảo mật Admin PIN**: Mọi thao tác ghi đè dữ liệu (`btnImportFullBackup` và `btnApplySyncCode`) đều bắt buộc phải xác thực Master PIN / Admin PIN (`verifyAdminPin`) nếu chưa đăng nhập.
+   - **Thẩm định Sâu Cấu Trúc (Deep Payload Validation)**: `validateSyncPayload()` bắt buộc duyệt kiểm tra từng phần tử:
+     - `categories`: Mảng các danh mục có `id` và `label` hợp lệ (chuỗi không rỗng).
+     - `links`: Mảng các website có `id`, `title`, và `url` bắt đầu bằng `http://` hoặc `https://`.
+     - `reminders`: Mảng các lời nhắc có `id` hợp lệ.
+     - `timetable`: Đối tượng thời khóa biểu sư phạm chuẩn.
+   - **Giới Hạn Kích Thước An Toàn (Payload Rate & Size Limiting)**: Chuỗi mã đồng bộ tối đa 500KB (`<= 500,000` ký tự), file sao lưu tải lên tối đa 2MB (`file.size <= 2,000,000` bytes).
+   - **Khôi phục Nguyên tử Bản sao Sâu (Atomic Deep-Clone Rollback)**: `applySyncData()` phải snapshot toàn bộ 4 mảng/đối tượng bằng deep clone (`JSON.parse(JSON.stringify(...))`) trước khi ghi, và rollback deep clone nếu có bất kỳ ngoại lệ nào xảy ra trong quá trình ghi.
+   - Sau khi áp dụng dữ liệu đồng bộ thành công, bắt buộc gọi `refreshAllAfterSync()` để re-render toàn diện giao diện:
+     - Giao diện danh bạ và tabs (`renderCategoryTabs`, `renderItems`).
+     - Thời khóa biểu và huy hiệu tiết học (`renderTimetableDay`, `updatePedagogicalBellBadge`).
+     - Thanh điều hướng đáy màn hình điện thoại di động (`syncBottomDock`).
+     - Huy hiệu và danh sách lời nhắc (`updateReminderBadge`, `renderReminderList`).
+     - Đồng hồ và lời chào (`updateClockAndGreeting`).
+

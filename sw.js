@@ -26,7 +26,7 @@ self.addEventListener('install', event => {
         }
       });
       await Promise.all(cachePromises);
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -63,12 +63,18 @@ self.addEventListener('fetch', event => {
               cache.put(req, networkResponse.clone());
             }
             return networkResponse;
-          }).catch(() => {
+          }).catch(async () => {
             // Mất mạng: Nếu là điều hướng trang, trả về index.html đã cache
             if (req.mode === 'navigate') {
-              return cache.match('./index.html', { ignoreSearch: true });
+              const fallback = await cache.match('./index.html', { ignoreSearch: true });
+              if (fallback) return fallback;
             }
-            return cachedResponse;
+            if (cachedResponse) return cachedResponse;
+            return new Response('Ngoại tuyến: Tài nguyên chưa được lưu trong bộ nhớ đệm.', {
+              status: 503,
+              statusText: 'Service Unavailable',
+              headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+            });
           });
 
           // Trả về bản cache ngay nếu có, nếu không thì chờ mạng

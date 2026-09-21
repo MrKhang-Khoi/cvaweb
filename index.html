@@ -1039,6 +1039,12 @@
       will-change: transform, opacity;
     }
 
+    @media (max-width: 767.98px) {
+      .bottom-dock {
+        display: flex !important;
+      }
+    }
+
     .bottom-dock.dock-hidden {
       transform: translate(-50%, calc(100% + 24px)) !important;
       opacity: 0 !important;
@@ -1465,10 +1471,12 @@
     .pwa-update-banner {
       position: sticky;
       top: 0;
-      z-index: 90;
+      left: 0;
+      right: 0;
+      z-index: 1000;
       background: linear-gradient(135deg, #1e3a8a, #2563eb);
       color: #ffffff;
-      padding: 10px 16px;
+      padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -3178,6 +3186,9 @@
         }
       });
 
+      const APP_VERSION = "2.1.0";
+      const SCHEMA_VERSION = 2;
+
       // ==========================================================================
       // 1. DANH SÁCH CHUẨN MẪU NGÀNH GIÁO DỤC VIỆT NAM (18 WEBSITE SƯ PHẠM CỐT LÕI)
       // ==========================================================================
@@ -3380,9 +3391,7 @@
 
       async function encryptVaultPayload(dataObj, pin, saltHex) {
         if (!window.crypto || !window.crypto.subtle) {
-          // Fallback lưu dạng mã hóa XOR-SHA256 nếu không có SubtleCrypto
-          const str = JSON.stringify(dataObj);
-          return "plain_b64:" + btoa(unescape(encodeURIComponent(str)));
+          throw new Error("Trình duyệt không hỗ trợ mã hóa an toàn phần cứng Web Crypto (AES-GCM). Thao tác bảo mật bị từ chối!");
         }
         const key = await deriveVaultKey(pin, saltHex);
         const iv = window.crypto.getRandomValues(new Uint8Array(12));
@@ -3401,9 +3410,8 @@
 
       async function decryptVaultPayload(cipherText, pin, saltHex) {
         if (!cipherText) return {};
-        if (cipherText.startsWith("plain_b64:")) {
-          const raw = decodeURIComponent(escape(atob(cipherText.replace("plain_b64:", ""))));
-          return JSON.parse(raw);
+        if (!window.crypto || !window.crypto.subtle) {
+          throw new Error("Trình duyệt không hỗ trợ giải mã an toàn Web Crypto (AES-GCM).");
         }
         if (cipherText.startsWith("aes_gcm:")) {
           const base64Data = cipherText.replace("aes_gcm:", "");
@@ -3421,13 +3429,7 @@
           const dec = new TextDecoder();
           return JSON.parse(dec.decode(decryptedBuf));
         }
-        // Trường hợp phiên bản cũ JSON thô: tự động nhận diện và migrate
-        try {
-          return JSON.parse(cipherText);
-        } catch(err) {
-          console.error("[Vault] Không thể giải mã dữ liệu sổ tay:", err);
-          throw new Error("Mật khẩu không đúng hoặc dữ liệu bị hỏng!");
-        }
+        throw new Error("Dữ liệu sổ tay không đúng định dạng mã hóa AES-GCM an toàn!");
       }
 
       // 2.4. QUẢN LÝ MẬT KHẨU ADMIN (ZERO HARDCODED BACKDOOR)
@@ -3436,8 +3438,8 @@
         const salt = localStorage.getItem("teacher_hub_admin_salt");
         const storedHash = localStorage.getItem("teacher_hub_admin_hash");
         if (!salt || !storedHash) {
-          await initAdminPin(enteredPin);
-          return true;
+          showToast("⚠️ Chưa thiết lập Mật khẩu Admin! Vui lòng bấm vào biểu tượng Khóa Admin để tạo mật khẩu bảo vệ trước khi ghi đè dữ liệu.", "error");
+          return false;
         }
         const enteredHash = await hashPassword(enteredPin, salt);
         if (enteredHash === storedHash) {
@@ -3485,6 +3487,7 @@
         } catch(err) {
           console.error("[Storage] Lỗi lưu categories:", err);
           showToast("Không thể lưu danh mục", "error");
+          throw err;
         }
       }
 
@@ -3512,6 +3515,7 @@
         } catch(err) {
           console.error("[Storage] Lỗi lưu links:", err);
           showToast("Không thể lưu dữ liệu liên kết", "error");
+          throw err;
         }
       }
 
@@ -4322,6 +4326,32 @@
           if (!qrSyncModal || !qrSyncCanvas) return;
           qrSyncModal.classList.add("active");
           const payload = getSyncPayload();
+          const payloadBytes = new TextEncoder().encode(payload).length;
+          const MAX_QR_SAFE_BYTES = 2500;
+          if (payloadBytes > MAX_QR_SAFE_BYTES) {
+            const ctx = qrSyncCanvas.getContext("2d");
+            const size = 280;
+            qrSyncCanvas.width = size;
+            qrSyncCanvas.height = size;
+            ctx.fillStyle = "#f8fafc";
+            ctx.fillRect(0, 0, size, size);
+            ctx.fillStyle = "#2563eb";
+            ctx.font = "bold 15px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("📦 DỮ LIỆU ĐẦY ĐỦ", size / 2, 70);
+            ctx.fillStyle = "#475569";
+            ctx.font = "12px sans-serif";
+            ctx.fillText("Dung lượng vượt giới hạn mã QR", size / 2, 105);
+            ctx.fillText(`(${Math.round(payloadBytes / 1024 * 10) / 10} KB > 2.5 KB)`, size / 2, 128);
+            ctx.fillStyle = "#0f172a";
+            ctx.font = "bold 12px sans-serif";
+            ctx.fillText("Thầy/Cô vui lòng sử dụng:", size / 2, 168);
+            ctx.fillStyle = "#2563eb";
+            ctx.fillText("📋 Nút 'Sao Chép Chuỗi Đồng Bộ'", size / 2, 195);
+            ctx.fillText("hoặc 📤 Nút 'Xuất File Sao Lưu'", size / 2, 218);
+            showToast("Dữ liệu lớn, vui lòng dùng Sao Chép Chuỗi hoặc Xuất File Sao Lưu!", "info");
+            return;
+          }
           try {
             let qr;
             try {
@@ -4371,9 +4401,22 @@
       }
 
       if (btnApplySyncCode) {
-        btnApplySyncCode.addEventListener("click", () => {
+        btnApplySyncCode.addEventListener("click", async () => {
+          if (!isAdminLoggedIn) {
+            const entered = prompt("🔐 Nhập mật khẩu Admin để có quyền nhập đè dữ liệu:");
+            if (!entered) return;
+            const isValid = await verifyAdminPin(entered);
+            if (!isValid) {
+              showToast("❌ Sai mật khẩu Admin!", "error");
+              return;
+            }
+          }
           const code = prompt("Dán mã đồng bộ (chuỗi JSON) vào đây:");
           if (!code) return;
+          if (code.length > 500000) {
+            showToast("Mã đồng bộ vượt quá kích thước cho phép (tối đa 500KB)!", "error");
+            return;
+          }
           try {
             const parsed = JSON.parse(code.trim());
             if (applySyncData(parsed)) {
@@ -4381,7 +4424,7 @@
               closeSyncModal();
               showToast("🎉 Đồng bộ dữ liệu thành công!");
             } else {
-              showToast("Mã đồng bộ không hợp lệ", "error");
+              showToast("Mã đồng bộ không hợp lệ hoặc cấu trúc không đúng!", "error");
             }
           } catch(err) {
             console.error("[Sync] Lỗi JSON:", err);
@@ -4412,52 +4455,164 @@
         });
       }
 
+      function validateSyncPayload(data) {
+        if (!data || typeof data !== "object") return false;
+        // Bắt buộc nghiêm ngặt schemaVersion === 2 theo đặc tả SPEC.md
+        if (data.schemaVersion !== SCHEMA_VERSION) return false;
+
+        // Bắt buộc kiểm tra sâu (deep validation) từng phần tử trong 4 nhóm dữ liệu
+        const validCategories = Array.isArray(data.categories) && data.categories.length > 0 &&
+          data.categories.every(c => c && typeof c === "object" && typeof c.id === "string" && c.id.trim() !== "" && typeof c.label === "string" && c.label.trim() !== "");
+
+        const validLinks = Array.isArray(data.links) && data.links.length > 0 &&
+          data.links.every(l => l && typeof l === "object" && typeof l.id === "string" && l.id.trim() !== "" && typeof l.title === "string" && l.title.trim() !== "" && typeof l.url === "string" && /^https?:\/\//i.test(l.url.trim()));
+
+        const validReminders = Array.isArray(data.reminders) &&
+          data.reminders.every(r => r && typeof r === "object" && typeof r.id === "string" && r.id.trim() !== "");
+
+        const REQUIRED_DAYS = ["2", "3", "4", "5", "6"];
+        const VALID_DAYS = new Set(["2", "3", "4", "5", "6", "7", "8", "CN"]);
+        const VALID_PERIOD_NAMES = new Set([
+          "Tiết 1", "Tiết 2", "Tiết 3", "Tiết 4", "Tiết 5",
+          "Tiết 6", "Tiết 7", "Tiết 8", "Tiết 9", "Tiết 10"
+        ]);
+        const validTimetable = Boolean(
+          data.timetable &&
+          typeof data.timetable === "object" &&
+          !Array.isArray(data.timetable) &&
+          REQUIRED_DAYS.every(dayKey => {
+            const periods = data.timetable[dayKey];
+            if (!periods || typeof periods !== "object" || Array.isArray(periods)) return false;
+            const pKeys = Object.keys(periods);
+            return pKeys.length > 0 && pKeys.every(pKey => {
+              const pTrim = pKey.trim();
+              return VALID_PERIOD_NAMES.has(pTrim) && typeof periods[pKey] === "string" && periods[pKey].trim().length <= 100;
+            });
+          }) &&
+          Object.keys(data.timetable).every(dayKey => VALID_DAYS.has(String(dayKey).trim()))
+        );
+
+        return Boolean(validCategories && validLinks && validReminders && validTimetable);
+      }
+
+      function refreshAllAfterSync() {
+        updateCategoryDropdowns();
+        renderCategoryTabs();
+        renderItems();
+        if (typeof renderTimetableDay === "function") {
+          renderTimetableDay(currentSelectedDay);
+        }
+        if (typeof updatePedagogicalBellBadge === "function") {
+          updatePedagogicalBellBadge();
+        }
+        if (typeof updateReminderBadge === "function") {
+          updateReminderBadge();
+        }
+        if (typeof renderReminderList === "function") {
+          renderReminderList();
+        }
+        syncBottomDock();
+        updateClockAndGreeting();
+      }
+
+      function getStandardTimetable() {
+        if (teacherTimetableData && typeof teacherTimetableData === "object" && Object.keys(teacherTimetableData).length > 0) {
+          let hasAny = false;
+          for (const k of Object.keys(teacherTimetableData)) {
+            if (teacherTimetableData[k] && typeof teacherTimetableData[k] === "object" && Object.keys(teacherTimetableData[k]).length > 0) {
+              hasAny = true;
+              break;
+            }
+          }
+          if (hasAny) return teacherTimetableData;
+        }
+        return {
+          "2": { "Tiết 1": "Chào cờ", "Tiết 2": "", "Tiết 3": "", "Tiết 4": "", "Tiết 5": "" },
+          "3": { "Tiết 1": "", "Tiết 2": "", "Tiết 3": "", "Tiết 4": "", "Tiết 5": "" },
+          "4": { "Tiết 1": "", "Tiết 2": "", "Tiết 3": "", "Tiết 4": "", "Tiết 5": "" },
+          "5": { "Tiết 1": "", "Tiết 2": "", "Tiết 3": "", "Tiết 4": "", "Tiết 5": "" },
+          "6": { "Tiết 1": "", "Tiết 2": "", "Tiết 3": "", "Tiết 4": "", "Tiết 5": "Sinh hoạt lớp" }
+        };
+      }
+
       function getSyncPayload() {
+        const tt = getStandardTimetable();
         return JSON.stringify({
           sync: "cva",
-          v: "2.1.0",
+          schemaVersion: SCHEMA_VERSION,
+          v: APP_VERSION,
+          exportedAt: new Date().toISOString(),
           categories: categoriesData,
           links: linksData,
-          reminders: remindersData
+          reminders: remindersData,
+          timetable: tt
         });
       }
 
       function applySyncData(imported) {
-        if (!imported) return false;
-        let count = 0;
-        if (imported.categories && Array.isArray(imported.categories)) {
-          categoriesData = imported.categories;
+        if (!validateSyncPayload(imported)) {
+          showToast("Dữ liệu đồng bộ không đúng cấu trúc hoặc thiếu thời khóa biểu!", "error");
+          return false;
+        }
+
+        // Tạo bản snapshot sao lưu phục hồi phòng ngừa sự cố bằng deep clone (Atomic Rollback)
+        const snapshot = {
+          categories: JSON.parse(JSON.stringify(categoriesData)),
+          links: JSON.parse(JSON.stringify(linksData)),
+          reminders: JSON.parse(JSON.stringify(remindersData)),
+          timetable: JSON.parse(JSON.stringify(teacherTimetableData))
+        };
+
+        try {
+          // Deep clone payload trước khi gán để triệt tiêu shared-references
+          categoriesData = JSON.parse(JSON.stringify(imported.categories));
+          linksData = JSON.parse(JSON.stringify(imported.links));
+          remindersData = JSON.parse(JSON.stringify(imported.reminders));
+          teacherTimetableData = JSON.parse(JSON.stringify(imported.timetable));
+
+          // Ghi nguyên tử vào storage (mọi hàm đều throw nếu storage bị lỗi/đầy quota)
           saveCategoriesStorage();
-          updateCategoryDropdowns();
-          renderCategoryTabs();
-          count++;
-        }
-        if (imported.links && Array.isArray(imported.links)) {
-          linksData = imported.links;
           saveToStorage();
-          renderItems();
-          count++;
-        }
-        if (imported.reminders && Array.isArray(imported.reminders)) {
-          remindersData = imported.reminders;
           saveRemindersStorage();
-          updateReminderBadge();
-          renderReminderList();
-          count++;
+          saveTimetableData();
+
+          refreshAllAfterSync();
+          return true;
+        } catch(err) {
+          console.error("[Sync] Lỗi áp dụng dữ liệu, tiến hành atomic rollback:", err);
+          // Rollback an toàn cả memory lẫn storage
+          try {
+            categoriesData = JSON.parse(JSON.stringify(snapshot.categories));
+            linksData = JSON.parse(JSON.stringify(snapshot.links));
+            remindersData = JSON.parse(JSON.stringify(snapshot.reminders));
+            teacherTimetableData = JSON.parse(JSON.stringify(snapshot.timetable));
+
+            localStorage.setItem("teacher_hub_categories_v1", JSON.stringify(snapshot.categories));
+            localStorage.setItem("teacher_hub_links_v2", JSON.stringify(snapshot.links));
+            localStorage.setItem("teacher_hub_reminders_v1", JSON.stringify(snapshot.reminders));
+            localStorage.setItem("teacher_hub_timetable_v1", JSON.stringify(snapshot.timetable));
+            refreshAllAfterSync();
+          } catch(rollbackErr) {
+            console.error("[Sync] Lỗi nghiêm trọng khi rollback dữ liệu:", rollbackErr);
+          }
+          showToast("Đã khôi phục dữ liệu ban đầu do lỗi ghi bộ nhớ!", "error");
+          return false;
         }
-        return count > 0;
       }
 
       if (btnExportFullBackup) {
         btnExportFullBackup.addEventListener("click", async () => {
           try {
+            const tt = getStandardTimetable();
             const bundle = {
               app: "Cổng Website Giáo Viên",
-              version: "2.1.0",
+              schemaVersion: SCHEMA_VERSION,
+              version: APP_VERSION,
               exportedAt: new Date().toISOString(),
               categories: categoriesData,
               links: linksData,
-              reminders: remindersData
+              reminders: remindersData,
+              timetable: tt
             };
             const jsonStr = JSON.stringify(bundle, null, 2);
             const blob = new Blob([jsonStr], { type: "application/json" });
@@ -4475,13 +4630,15 @@
               return;
             }
 
-            // Tải file trực tiếp
+            // Tải file trực tiếp và dọn dẹp bộ nhớ an toàn
             const dl = document.createElement("a");
-            dl.href = URL.createObjectURL(blob);
+            const objectUrl = URL.createObjectURL(blob);
+            dl.href = objectUrl;
             dl.download = fileName;
             document.body.appendChild(dl);
             dl.click();
             dl.remove();
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
             showToast("✅ Đã tải file sao lưu đầy đủ về máy!");
           } catch(err) {
             console.error("[Backup] Lỗi xuất file sao lưu:", err);
@@ -4521,9 +4678,7 @@
             categoriesData = [...DEFAULT_CATEGORIES];
             saveToStorage();
             saveCategoriesStorage();
-            updateCategoryDropdowns();
-            renderCategoryTabs();
-            renderItems();
+            refreshAllAfterSync();
             closeSyncModal();
             showToast("✅ Đã khôi phục danh sách 18 website chuẩn!");
           }
@@ -4531,9 +4686,27 @@
       }
 
       if (fileInput) {
-        fileInput.addEventListener("change", (e) => {
+        fileInput.addEventListener("change", async (e) => {
           const file = e.target.files[0];
           if (!file) return;
+          if (!isAdminLoggedIn) {
+            const entered = prompt("🔐 Nhập mật khẩu Admin để có quyền nhập đè dữ liệu từ file sao lưu:");
+            if (!entered) {
+              fileInput.value = "";
+              return;
+            }
+            const isValid = await verifyAdminPin(entered);
+            if (!isValid) {
+              showToast("❌ Sai mật khẩu Admin!", "error");
+              fileInput.value = "";
+              return;
+            }
+          }
+          if (file.size > 2000000) {
+            showToast("File sao lưu vượt quá dung lượng cho phép (tối đa 2MB)!", "error");
+            fileInput.value = "";
+            return;
+          }
           const reader = new FileReader();
           reader.onload = (event) => {
             try {
@@ -4542,7 +4715,7 @@
                 closeSyncModal();
                 showToast("🎉 Đồng bộ dữ liệu thành công!");
               } else {
-                showToast("File không đúng cấu trúc dữ liệu", "error");
+                showToast("File không đúng cấu trúc dữ liệu hoặc thiếu thời khóa biểu!", "error");
               }
             } catch(err) {
               console.error("[Import] Lỗi đọc file JSON:", err);
@@ -5553,23 +5726,112 @@
         }
       });
 
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js').then(reg => {
-            reg.onupdatefound = () => {
-              const installingWorker = reg.installing;
-              installingWorker.onstatechange = () => {
-                if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  showToast("⚡ Đã có bản cập nhật mới! Tự động làm mới sau giây lát...");
-                  setTimeout(() => {
-                    installingWorker.postMessage({ action: 'skipWaiting' });
-                    window.location.reload();
-                  }, 1800);
+      // ==========================================================================
+      // 18. SERVICE WORKER PWA AUTO-UPDATE & OFFLINE ENGINE
+      // ==========================================================================
+      const pwaUpdateBanner = document.getElementById("pwaUpdateBanner");
+      const btnApplyUpdate = document.getElementById("btnApplyUpdate");
+      const btnCloseUpdateBanner = document.getElementById("btnCloseUpdateBanner");
+      const btnCheckAppUpdateNow = document.getElementById("btnCheckAppUpdateNow");
+
+      let swRegistration = null;
+      let waitingWorker = null;
+      let isRefreshing = false;
+      let updateApproved = false; // CỜ BẢO VỆ: Chỉ reload khi người dùng đã chủ động bấm nút "Cập Nhật Ngay"
+
+      function showUpdateBanner(worker) {
+        waitingWorker = worker;
+        if (pwaUpdateBanner) {
+          pwaUpdateBanner.style.display = "flex";
+        }
+        showToast(`⚡ Đã có phiên bản mới (v${APP_VERSION})! Thầy/Cô có thể bấm Cập Nhật Ngay.`, "info");
+      }
+
+      function hideUpdateBanner() {
+        if (pwaUpdateBanner) {
+          pwaUpdateBanner.style.display = "none";
+        }
+      }
+
+      if (btnApplyUpdate) {
+        btnApplyUpdate.addEventListener("click", () => {
+          const worker = waitingWorker || (swRegistration && swRegistration.waiting);
+          if (worker) {
+            updateApproved = true;
+            showToast("🚀 Đang kích hoạt phiên bản mới...");
+            worker.postMessage({ action: "skipWaiting" });
+          } else {
+            hideUpdateBanner();
+            showToast("Ứng dụng đã ở trạng thái mới nhất!");
+          }
+        });
+      }
+
+      if (btnCloseUpdateBanner) {
+        btnCloseUpdateBanner.addEventListener("click", () => {
+          hideUpdateBanner();
+        });
+      }
+
+      if (btnCheckAppUpdateNow) {
+        btnCheckAppUpdateNow.addEventListener("click", async () => {
+          if (!navigator.onLine) {
+            showToast("📶 Đang ở chế độ ngoại tuyến, không thể kiểm tra bản cập nhật mới.", "warning");
+            return;
+          }
+          if (!swRegistration) {
+            showToast("Đang kết nối Service Worker, vui lòng thử lại sau giây lát.", "info");
+            return;
+          }
+
+          showToast("🔄 Đang kiểm tra bản cập nhật mới nhất từ máy chủ...");
+          try {
+            await swRegistration.update();
+            if (swRegistration.waiting) {
+              showUpdateBanner(swRegistration.waiting);
+            } else if (swRegistration.installing) {
+              showToast("📦 Đang tải về bản cập nhật mới ngầm trong nền...");
+            } else {
+              showToast(`🎉 Thầy/Cô đang sử dụng phiên bản mới nhất (v${APP_VERSION})!`);
+            }
+          } catch(err) {
+            console.warn("[SW Update] Lỗi khi kiểm tra:", err);
+            showToast("Không thể kết nối máy chủ để kiểm tra cập nhật", "error");
+          }
+        });
+      }
+
+      if ("serviceWorker" in navigator) {
+        // Chỉ reload khi người dùng đã chủ động bấm chấp thuận cập nhật (updateApproved === true)
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (updateApproved && !isRefreshing) {
+            isRefreshing = true;
+            window.location.reload();
+          }
+        });
+
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("./sw.js").then(reg => {
+            swRegistration = reg;
+
+            // 1. Kiểm tra nếu đã có worker đang chờ (ví dụ tải xong từ phiên trước)
+            if (reg.waiting) {
+              showUpdateBanner(reg.waiting);
+            }
+
+            // 2. Lắng nghe khi phát hiện phiên bản mới đang cài đặt
+            reg.addEventListener("updatefound", () => {
+              const newWorker = reg.installing;
+              if (!newWorker) return;
+              newWorker.addEventListener("statechange", () => {
+                if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+                  // Đã cài đặt xong và đang chờ người dùng cho phép áp dụng
+                  showUpdateBanner(newWorker);
                 }
-              };
-            };
+              });
+            });
           }).catch(err => {
-            console.warn('[ServiceWorker] Lỗi đăng ký:', err);
+            console.warn("[ServiceWorker] Lỗi đăng ký:", err);
           });
         });
       }
@@ -5644,6 +5906,7 @@
         } catch(err) {
           console.error("[Reminders] Lỗi lưu:", err);
           showToast("Không thể lưu lời nhắc", "error");
+          throw err;
         }
       }
 
@@ -5988,6 +6251,7 @@
         } catch(err) {
           console.error("[Timetable] Lỗi lưu:", err);
           showToast("Không thể lưu thời khóa biểu", "error");
+          throw err;
         }
       }
 
