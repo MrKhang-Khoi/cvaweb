@@ -1,0 +1,17 @@
+{
+  "name": "teacher-hub-portal",
+  "version": "2.1.0",
+  "description": "Cổng Website Giáo Viên - Tiện Ích Sư Phạm & Sổ Tay Mật Khẩu An Toàn (PWA)",
+  "scripts": {
+    "test": "node test/run_all_tests.js",
+    "lint": "oxlint sw.js"
+  },
+  "keywords": [
+    "education",
+    "pwa",
+    "teacher-hub",
+    "vietnam-edu"
+  ],
+  "author": "Antigravity & CVA Pedagogical Team",
+  "license": "MIT"
+}

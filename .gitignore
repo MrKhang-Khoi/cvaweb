@@ -1,0 +1,14 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Codegraph
+.codegraph/
+
+# Temporary / Scratch
+scratch/
+node_modules/
+*.log
+
+# KHKT separated into independent repo appkhkt2627
+khkt-smart-guardian/
