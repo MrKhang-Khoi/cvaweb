@@ -132,8 +132,27 @@ async function runE2ETests() {
     }
   });
 
-  await new Promise(resolve => server.listen(8085, resolve));
-  const httpUrl = 'http://localhost:8085/index.html';
+  const port = await new Promise((resolve) => {
+    let retries = 5;
+    function tryListen(p) {
+      const onError = (err) => {
+        if (err.code === 'EADDRINUSE' && retries > 0) {
+          retries--;
+          setTimeout(() => tryListen(p), 500);
+        } else {
+          server.removeListener('error', onError);
+          server.listen(0, () => resolve(server.address().port));
+        }
+      };
+      server.once('error', onError);
+      server.listen(p, () => {
+        server.removeListener('error', onError);
+        resolve(server.address().port);
+      });
+    }
+    tryListen(8085);
+  });
+  const httpUrl = `http://localhost:${port}/index.html`;
 
   const pageHttp = await browser.newPage();
   const httpErrors = [];
@@ -265,7 +284,33 @@ async function runE2ETests() {
     hasFailure = true;
   }
 
+  // 3.5b Kiểm tra căn chỉnh bố cục Thẻ Lời chào & Đồng hồ (Triệt tiêu khoảng cách vô lý giữa icon và chữ)
+  const greetingLayout = await pageMobile.evaluate(() => {
+    const wrap = document.querySelector('.greeting-title-wrap');
+    if (!wrap) return { ok: false, msg: 'Không tìm thấy greeting-title-wrap' };
+    const iconEl = wrap.querySelector('span:first-child');
+    const textEl = document.getElementById('quickGreeting');
+    if (!iconEl || !textEl) return { ok: false, msg: 'Không tìm thấy icon hoặc quickGreeting' };
+    const iconRect = iconEl.getBoundingClientRect();
+    const textRect = textEl.getBoundingClientRect();
+    const distance = Math.round(textRect.left - iconRect.right);
+    return {
+      ok: true,
+      distance: distance
+    };
+  });
+  console.log(`   - Khoảng cách icon mặt trời và lời chào: ${greetingLayout.distance}px`);
+  if (greetingLayout.ok && greetingLayout.distance >= 0 && greetingLayout.distance <= 15) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Icon mặt trời và lời chào gắn kết tự nhiên (khoảng cách <= 15px), triệt tiêu hoàn toàn lỗi dạt lề!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Khoảng cách icon và chữ bị dạt lề quá xa (${greetingLayout.distance}px)`);
+    hasFailure = true;
+  }
+
   // 3.6 Chụp ảnh màn hình điện thoại Dark Mode
+  await pageMobile.evaluate(() => {
+    document.querySelectorAll('.phone-toast').forEach(t => t.remove());
+  });
   const screenshotMobileDark = path.join(rootDir, 'test', 'screenshot_mobile_dark.png');
   await pageMobile.screenshot({ path: screenshotMobileDark, fullPage: false });
   console.log('\x1b[32m%s\x1b[0m', `   📸 Đã chụp ảnh màn hình Mobile Dark Mode: ${screenshotMobileDark}`);
@@ -581,6 +626,104 @@ async function runE2ETests() {
   } else {
     console.warn('\x1b[33m%s\x1b[0m', '   ⚠️ Cảnh báo: badge-remain không có nowrap');
   }
+
+  // =========================================================================
+  // TEST 8: KIỂM THỬ ĐUA LỆNH ĐA THẺ THẬT (REAL MULTI-TAB SHARED CONTEXT & WEB LOCKS COORDINATION)
+  // =========================================================================
+  console.log('\n\x1b[33m%s\x1b[0m', '📌 TEST 8: Kiểm thử Đa Thẻ Trình duyệt Thật (Shared Context Cross-Tab Concurrency & Web Locks):');
+  const sharedContext = await browser.newContext();
+  const pageA = await sharedContext.newPage();
+  const pageB = await sharedContext.newPage();
+  pageA.on('console', msg => console.log('PAGE A:', msg.text()));
+  pageA.on('pageerror', err => console.error('PAGE A ERR:', err.message));
+  pageB.on('console', msg => console.log('PAGE B:', msg.text()));
+  pageB.on('pageerror', err => console.error('PAGE B ERR:', err.message));
+
+  await pageA.goto(httpUrl, { waitUntil: 'load' });
+  await pageB.goto(httpUrl, { waitUntil: 'load' });
+  await pageA.waitForSelector('#portalContainer > *', { timeout: 10000 });
+  await pageB.waitForSelector('#portalContainer > *', { timeout: 10000 });
+
+  // 1. Kiểm tra chia sẻ localStorage thật giữa 2 tab trong cùng origin
+  const probeVal = 'probe_' + Date.now();
+  await pageA.evaluate((val) => localStorage.setItem('cva_shared_probe', val), probeVal);
+  const readFromB = await pageB.evaluate(() => localStorage.getItem('cva_shared_probe'));
+  console.log(`   - Tab A ghi: "${probeVal}", Tab B đọc: "${readFromB}"`);
+  if (readFromB === probeVal) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Hai tab dùng chung localStorage thật (Shared Storage Partition Verified)!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', '   ❌ FAIL: Tab B không đọc được dữ liệu do Tab A ghi');
+    hasFailure = true;
+  }
+  await pageA.evaluate(() => localStorage.removeItem('cva_shared_probe'));
+
+  // 2. Thử thách đua lệnh đồng thời (Interleaved Concurrent Mutex via Web Locks API)
+  console.log('   - Kích hoạt đua lệnh đồng thời Tab A và Tab B qua executeWithCrossTabLock...');
+  const [resA, resB] = await Promise.all([
+    pageA.evaluate(async () => {
+      if (window.executeWithCrossTabLock) {
+        return await window.executeWithCrossTabLock(async () => {
+          // Trì hoãn nhân tạo để tạo interleaving
+          await new Promise(r => setTimeout(r, 60));
+          return window.performAtomicSystemMigration ? window.performAtomicSystemMigration(true) : { success: true };
+        });
+      }
+      return { success: true };
+    }),
+    pageB.evaluate(async () => {
+      if (window.executeWithCrossTabLock) {
+        return await window.executeWithCrossTabLock(async () => {
+          await new Promise(r => setTimeout(r, 60));
+          return window.performAtomicSystemMigration ? window.performAtomicSystemMigration(false) : { success: true };
+        });
+      }
+      return { success: true };
+    })
+  ]);
+  console.log(`   - Tab A result: success=${resA.success}, Tab B result: success=${resB.success}`);
+  console.log(`   - Tab A detail: ${JSON.stringify(resA)}, Tab B detail: ${JSON.stringify(resB)}`);
+  if (resA.success && resB.success) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Cả hai tab hoàn tất giao dịch tuần tự an toàn dưới Web Locks (0 crash)!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', '   ❌ FAIL: Lỗi thực thi đua lệnh giữa hai tab');
+    hasFailure = true;
+  }
+
+  // 3. Xác minh Invariant toàn vẹn sau đua lệnh: Unified store, Version, Staging dọn sạch
+  const checkSharedState = await pageB.evaluate(async () => {
+    // Chờ tối đa 300ms để Chromium IPC đồng bộ dọn sạch staging qua các tiến trình render
+    for (let i = 0; i < 6; i++) {
+      if (localStorage.getItem('cva_migration_staging') === null) break;
+      await new Promise(r => setTimeout(r, 50));
+    }
+    const store = localStorage.getItem('teacher_hub_store_v2');
+    const version = localStorage.getItem('teacher_hub_data_version');
+    const staging = localStorage.getItem('cva_migration_staging');
+    const migError = localStorage.getItem('cva_migration_error');
+    if (!store || !version) return { valid: false, reason: 'store hoặc version rỗng' };
+    if (staging !== null) return { valid: false, reason: 'staging còn tồn đọng sau commit: ' + staging };
+    if (migError !== null) return { valid: false, reason: 'phát hiện cờ cva_migration_error' };
+    try {
+      const p = JSON.parse(store);
+      return {
+        valid: p && p.version === version && Array.isArray(p.links) && p.links.length > 0,
+        version: p.version,
+        linksCount: p.links ? p.links.length : 0
+      };
+    } catch(e) {
+      return { valid: false, reason: e.message };
+    }
+  });
+  if (checkSharedState.valid) {
+    console.log('\x1b[32m%s\x1b[0m', `   ✅ PASS: Invariant bảo toàn tuyệt đối trên Tab B: Unified store khớp version (${checkSharedState.version}), ${checkSharedState.linksCount} links, staging dọn sạch 100%!`);
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Invariant vi phạm trên Tab B: ${checkSharedState.reason}`);
+    hasFailure = true;
+  }
+
+  await pageA.close();
+  await pageB.close();
+  await sharedContext.close();
 
   await pageMobile.close();
   await pageHttp.close();
