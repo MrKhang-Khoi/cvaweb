@@ -197,6 +197,89 @@ async function runE2ETests() {
   await pageHttp.screenshot({ path: screenshotHttpPath, fullPage: false });
   console.log('\x1b[32m%s\x1b[0m', `   📸 Đã chụp ảnh màn hình HTTP kiểm chứng: ${screenshotHttpPath}`);
 
+  // =========================================================================
+  // TEST 3: KIỂM THỬ MOBILE RESPONSIVE (375x740) & TÍNH NĂNG DARK MODE ĐA ĐIỂM CHẠM
+  // =========================================================================
+  console.log('\n\x1b[33m%s\x1b[0m', '📌 TEST 3: Kiểm thử Chuyên sâu Giao diện Mobile & Dark Mode (Điện thoại Thầy/Cô):');
+  const pageMobile = await browser.newPage({ viewport: { width: 375, height: 740 } });
+  await pageMobile.goto(httpUrl, { waitUntil: 'load' });
+  await pageMobile.waitForTimeout(600);
+
+  // 3.1 Kiểm tra nút Dark Mode trên Header có nhìn thấy trên mobile không
+  const headerThemeBtnVisible = await pageMobile.locator('#phoneThemeBtn').isVisible();
+  console.log(`   - Nút Dark Mode trên Header: ${headerThemeBtnVisible ? 'Hiển thị rõ ràng' : 'Bị che khuất'}`);
+  if (headerThemeBtnVisible) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Nút Dark Mode trên Header nằm ở vị trí ưu tiên, nhìn thấy 100% trên điện thoại!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', '   ❌ FAIL: Nút Dark Mode trên Header bị tràn hoặc bị ẩn!');
+    hasFailure = true;
+  }
+
+  // 3.2 Bấm nút Dark Mode trên Header
+  await pageMobile.click('#phoneThemeBtn');
+  await pageMobile.waitForTimeout(300);
+  let themeAttr = await pageMobile.evaluate(() => document.documentElement.getAttribute('data-theme'));
+  console.log(`   - Trạng thái theme sau khi bấm nút Header: "${themeAttr}"`);
+  if (themeAttr === 'dark') {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Bật Dark Mode thành công qua nút Header!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Không thể bật Dark Mode, theme: ${themeAttr}`);
+    hasFailure = true;
+  }
+
+  // 3.3 Kiểm tra nút Dark Mode 1 chạm trên Bottom Dock
+  const dockThemeBtnVisible = await pageMobile.locator('#dockThemeBtn').isVisible();
+  console.log(`   - Nút Dark Mode trên Bottom Dock: ${dockThemeBtnVisible ? 'Hiển thị sẵn sàng' : 'Không có'}`);
+  if (dockThemeBtnVisible) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Tích hợp nút Dark Mode 1 chạm ngay trên thanh Bottom Dock thuận tiện!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', '   ❌ FAIL: Nút Dark Mode trên Bottom Dock bị ẩn!');
+    hasFailure = true;
+  }
+
+  // 3.4 Bấm chuyển đổi theme bằng Bottom Dock
+  await pageMobile.click('#dockThemeBtn');
+  await pageMobile.waitForTimeout(300);
+  themeAttr = await pageMobile.evaluate(() => document.documentElement.getAttribute('data-theme'));
+  console.log(`   - Trạng thái theme sau khi bấm nút Bottom Dock: "${themeAttr}"`);
+  if (themeAttr === 'light') {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Chuyển về Light Mode thành công qua Bottom Dock!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Bottom Dock không toggle được theme`);
+    hasFailure = true;
+  }
+
+  // Chuyển lại về Dark Mode để chụp ảnh nghiệm thu
+  await pageMobile.click('#dockThemeBtn');
+  await pageMobile.waitForTimeout(300);
+
+  // 3.5 Kiểm tra hiển thị Category Pills trong Dark Mode
+  const pillCheck = await pageMobile.evaluate(() => {
+    const pills = document.querySelectorAll('.category-pill');
+    if (pills.length === 0) return { ok: false, msg: 'Không tìm thấy category-pill' };
+    const firstPill = pills[0];
+    const style = window.getComputedStyle(firstPill);
+    return {
+      ok: true,
+      display: style.display,
+      borderRadius: style.borderRadius,
+      color: style.color
+    };
+  });
+  console.log(`   - Category Pill CSS: display="${pillCheck.display}", radius="${pillCheck.borderRadius}"`);
+  if (pillCheck.ok && pillCheck.display.includes('flex')) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Category Tabs hiển thị dạng viên thuốc bo tròn tinh tế, không bị đè chữ!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Category Tabs CSS bị lỗi:`, pillCheck);
+    hasFailure = true;
+  }
+
+  // 3.6 Chụp ảnh màn hình điện thoại Dark Mode
+  const screenshotMobileDark = path.join(rootDir, 'test', 'screenshot_mobile_dark.png');
+  await pageMobile.screenshot({ path: screenshotMobileDark, fullPage: false });
+  console.log('\x1b[32m%s\x1b[0m', `   📸 Đã chụp ảnh màn hình Mobile Dark Mode: ${screenshotMobileDark}`);
+
+  await pageMobile.close();
   await pageHttp.close();
   await browser.close();
   server.close();

@@ -232,10 +232,11 @@
     @media (max-width: 480px) {
       .top-bar {
         padding: 4px 0 10px 0;
-        gap: 4px;
+        gap: 6px;
       }
       .brand-group {
         gap: 6px;
+        flex-shrink: 0;
       }
       .brand-badge {
         width: 32px;
@@ -248,39 +249,53 @@
         height: 17px;
       }
       .brand-title {
-        font-size: 0.90rem;
+        font-size: 0.88rem;
+        white-space: nowrap;
+      }
+      .brand-title-extra {
+        display: none !important;
       }
       .top-actions {
-        gap: 2.5px;
+        gap: 4px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+        padding: 2px 0;
+        max-width: calc(100% - 110px);
+      }
+      .top-actions::-webkit-scrollbar {
+        display: none;
       }
       .icon-btn {
         width: 34px;
         height: 34px;
         min-width: 34px;
         border-radius: 8px;
+        flex-shrink: 0;
       }
       .icon-btn svg {
-        width: 16px;
-        height: 16px;
+        width: 17px;
+        height: 17px;
       }
     }
 
     @media (max-width: 360px) {
       .brand-title {
-        font-size: 0.91rem;
+        font-size: 0.82rem;
       }
       .brand-badge {
+        width: 30px;
+        height: 30px;
+        min-width: 30px;
+      }
+      .icon-btn {
         width: 32px;
         height: 32px;
         min-width: 32px;
       }
-      .icon-btn {
-        width: 34px;
-        height: 34px;
-        min-width: 34px;
-      }
       .top-actions {
-        gap: 2px;
+        gap: 3px;
+        max-width: calc(100% - 95px);
       }
     }
 
@@ -319,13 +334,15 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 14px;
+      gap: 8px;
+      padding: 8px 12px;
       background: var(--card-bg);
       border: 1px solid var(--card-border);
       border-radius: var(--radius-md);
       margin-bottom: 12px;
       box-shadow: var(--shadow-sm);
       font-size: 0.82rem;
+      transition: background-color 0.2s ease, border-color 0.2s ease;
     }
 
     .greeting-left {
@@ -334,6 +351,70 @@
       gap: 6px;
       font-weight: 700;
       color: var(--primary);
+      min-width: 0;
+      flex: 1;
+      flex-wrap: wrap;
+    }
+
+    .greeting-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    #pedagogicalBellBadge {
+      display: none;
+      align-items: center;
+      gap: 5px;
+      background: var(--primary-light);
+      color: var(--primary);
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      white-space: nowrap;
+      border: 1px solid rgba(37, 99, 235, 0.25);
+      transition: all 0.15s ease;
+    }
+
+    [data-theme="dark"] .greeting-left {
+      color: #93c5fd;
+    }
+
+    [data-theme="dark"] #pedagogicalBellBadge {
+      background: rgba(59, 130, 246, 0.22) !important;
+      color: #bfdbfe !important;
+      border-color: rgba(59, 130, 246, 0.35) !important;
+    }
+
+    @media (max-width: 480px) {
+      .mini-greeting-chip {
+        padding: 8px 10px;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .greeting-left {
+        width: 100%;
+        justify-content: space-between;
+        gap: 4px;
+        font-size: 0.80rem;
+      }
+      .greeting-right {
+        width: 100%;
+        justify-content: flex-end;
+        gap: 6px;
+        padding-top: 4px;
+        border-top: 1px dashed var(--card-border);
+      }
+      #pedagogicalBellBadge {
+        font-size: 0.72rem;
+        padding: 2px 8px;
+        max-width: 60%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
     }
 
     .clock-right {
@@ -419,12 +500,12 @@
     .cat-scroll-track {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       overflow-x: auto;
       width: 100%;
       max-width: 100%;
       box-sizing: border-box;
-      padding-bottom: 12px;
+      padding: 4px 2px 14px 2px;
       scrollbar-width: none; /* Ẩn thanh cuộn xấu trên mobile */
       -webkit-overflow-scrolling: touch;
     }
@@ -433,12 +514,13 @@
       display: none;
     }
 
-    .cat-pill {
+    .cat-pill,
+    .category-pill {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 6px 14px;
-      min-height: 44px;
+      padding: 7px 14px;
+      min-height: 40px;
       border-radius: var(--radius-full);
       font-size: 0.84rem;
       font-weight: 700;
@@ -448,17 +530,41 @@
       border: 1px solid var(--card-border);
       transition: all 0.15s ease;
       user-select: none;
+      cursor: pointer;
+      flex-shrink: 0;
     }
 
-    .cat-pill:active {
+    .cat-pill:hover,
+    .category-pill:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .cat-pill:active,
+    .category-pill:active {
       transform: scale(0.96);
     }
 
-    .cat-pill.active {
+    .cat-pill.active,
+    .category-pill.active {
       background: var(--primary);
-      color: #ffffff;
+      color: #ffffff !important;
       border-color: var(--primary);
-      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+    }
+
+    [data-theme="dark"] .cat-pill,
+    [data-theme="dark"] .category-pill {
+      background: var(--card-bg);
+      color: var(--text-sub);
+      border-color: var(--card-border);
+    }
+
+    [data-theme="dark"] .cat-pill.active,
+    [data-theme="dark"] .category-pill.active {
+      background: var(--primary);
+      color: #ffffff !important;
+      border-color: var(--primary);
     }
 
     /* ==========================================================================
@@ -1993,7 +2099,24 @@
           <span id="reminderBadgeCount" class="reminder-badge-count" style="display: none;">0</span>
         </button>
 
-        <!-- Sổ tay Tài khoản & Mật khẩu (Lưu Cục Bộ) -->
+        <!-- Theme Sáng / Tối (Ưu tiên hiển thị trên mọi thiết bị) -->
+        <button id="phoneThemeBtn" class="icon-btn" title="Chuyển chế độ Sáng / Tối">
+          <svg id="themeMoon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+          <svg id="themeSun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+
         <!-- Thời khóa biểu & Tiết học sư phạm -->
         <button id="phoneTimetableBtn" class="icon-btn" title="Thời khóa biểu & Tiết học chuẩn Bộ GD&ĐT">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2004,19 +2127,20 @@
           </svg>
         </button>
 
+        <!-- Sổ tay Tài khoản & Mật khẩu Cá nhân (Lưu cục bộ) -->
+        <button id="phoneVaultBtn" class="icon-btn" title="Sổ tay Tài khoản & Mật khẩu Cá nhân (Lưu cục bộ)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 2l-2 2m-1.5 1.5L14 9a5 5 0 1 0 3 3l3.5-3.5 1.5 1.5L24 8l-2-2 2-2-3-3z"></path>
+            <circle cx="7.5" cy="16.5" r="3.5"></circle>
+          </svg>
+        </button>
+
         <!-- Tiện ích Lớp học Tương tác: Bốc thăm & Đếm ngược giờ thi -->
         <button id="phoneClassroomBtn" class="icon-btn" title="Tiện ích Sư phạm: Bốc thăm ngẫu nhiên & Đếm ngược giờ thi">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"></circle>
             <circle cx="12" cy="12" r="6"></circle>
             <circle cx="12" cy="12" r="2"></circle>
-          </svg>
-        </button>
-
-        <button id="phoneVaultBtn" class="icon-btn" title="Sổ tay Tài khoản & Mật khẩu Cá nhân (Lưu cục bộ)">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 2l-2 2m-1.5 1.5L14 9a5 5 0 1 0 3 3l3.5-3.5 1.5 1.5L24 8l-2-2 2-2-3-3z"></path>
-            <circle cx="7.5" cy="16.5" r="3.5"></circle>
           </svg>
         </button>
 
@@ -2040,24 +2164,6 @@
             <line x1="12" y1="15" x2="12" y2="3"></line>
           </svg>
         </button>
-
-        <!-- Theme Sáng / Tối -->
-        <button id="phoneThemeBtn" class="icon-btn" title="Chuyển chế độ Sáng / Tối">
-          <svg id="themeMoon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-          </svg>
-          <svg id="themeSun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
-            <circle cx="12" cy="12" r="5"></circle>
-            <line x1="12" y1="1" x2="12" y2="3"></line>
-            <line x1="12" y1="21" x2="12" y2="23"></line>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-            <line x1="1" y1="12" x2="3" y2="12"></line>
-            <line x1="21" y1="12" x2="23" y2="12"></line>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-          </svg>
-        </button>
       </div>
     </header>
 
@@ -2068,7 +2174,7 @@
         <span id="quickGreeting">Chào buổi sáng, Thầy/Cô!</span>
         <div id="pedagogicalBellBadge" style="display:none; align-items:center; gap:5px; background:var(--primary-light); color:var(--primary); font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:var(--radius-full); cursor:pointer;" title="Bấm để xem Thời khóa biểu">🔔 Đang tải tiết...</div>
       </div>
-      <div style="display: flex; align-items: center; gap: 8px;">
+      <div class="greeting-right">
         <button id="btnInstallPwa" class="btn-install-pwa" title="Cài ứng dụng vào điện thoại để mở nhanh và dùng offline">
           <span>📲 Cài App</span>
         </button>
@@ -2223,6 +2329,23 @@
         <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
       </svg>
       <span>Công cụ AI</span>
+    </button>
+    <button class="dock-tab btn-dock-theme" id="dockThemeBtn" title="Chuyển chế độ Sáng / Tối">
+      <svg id="dockMoonSvg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+      </svg>
+      <svg id="dockSunSvg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+        <circle cx="12" cy="12" r="5"></circle>
+        <line x1="12" y1="1" x2="12" y2="3"></line>
+        <line x1="12" y1="21" x2="12" y2="23"></line>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+        <line x1="1" y1="12" x2="3" y2="12"></line>
+        <line x1="21" y1="12" x2="23" y2="12"></line>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+      </svg>
+      <span id="dockThemeText">Giao diện</span>
     </button>
   </nav>
 
@@ -4735,20 +4858,56 @@
       }
 
       // ==========================================================================
-      // 13. THEME
+      // 13. THEME SÁNG / TỐI (DARK MODE TỰ ĐỘNG & ĐỒNG BỘ ĐA ĐIỂM CHẠM)
       // ==========================================================================
       function applyTheme(t) {
         currentTheme = t;
         document.documentElement.setAttribute("data-theme", t);
         localStorage.setItem("teacher_hub_theme", t);
+
+        const isDark = t === "dark";
+
+        // 1. Đồng bộ icon Header
+        const themeMoon = document.getElementById("themeMoon");
+        const themeSun = document.getElementById("themeSun");
+        if (themeMoon && themeSun) {
+          themeMoon.style.display = isDark ? "none" : "block";
+          themeSun.style.display = isDark ? "block" : "none";
+        }
+
+        // 2. Đồng bộ icon & chữ trên Bottom Dock
+        const dockMoonSvg = document.getElementById("dockMoonSvg");
+        const dockSunSvg = document.getElementById("dockSunSvg");
+        const dockThemeText = document.getElementById("dockThemeText");
+        if (dockMoonSvg && dockSunSvg) {
+          dockMoonSvg.style.display = isDark ? "none" : "block";
+          dockSunSvg.style.display = isDark ? "block" : "none";
+        }
+        if (dockThemeText) {
+          dockThemeText.textContent = isDark ? "Nền sáng" : "Nền tối";
+        }
+
+        // 3. Đồng bộ màu Status Bar điện thoại
+        const metaTheme = document.querySelector('meta[name="theme-color"]');
+        if (metaTheme) {
+          metaTheme.setAttribute("content", isDark ? "#090d16" : "#2563eb");
+        }
+      }
+
+      function toggleTheme() {
+        const nextTheme = currentTheme === "light" ? "dark" : "light";
+        applyTheme(nextTheme);
+        showToast(nextTheme === "dark" ? "🌙 Đã bật Giao diện Tối dịu mắt" : "☀️ Đã bật Giao diện Sáng tinh tế");
       }
 
       const phoneThemeBtn = document.getElementById("phoneThemeBtn");
       if (phoneThemeBtn) {
-        phoneThemeBtn.addEventListener("click", () => {
-          applyTheme(currentTheme === "light" ? "dark" : "light");
-          showToast(currentTheme === "dark" ? "🌙 Chế độ nền tối dịu mắt" : "☀️ Chế độ sáng");
-        });
+        phoneThemeBtn.addEventListener("click", toggleTheme);
+      }
+
+      const dockThemeBtn = document.getElementById("dockThemeBtn");
+      if (dockThemeBtn) {
+        dockThemeBtn.addEventListener("click", toggleTheme);
       }
 
       // ==========================================================================
@@ -6596,7 +6755,13 @@
         updateClockAndGreeting();
 
         const savedTheme = localStorage.getItem("teacher_hub_theme");
-        if (savedTheme) applyTheme(savedTheme);
+        if (savedTheme) {
+          applyTheme(savedTheme);
+        } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+          applyTheme("dark");
+        } else {
+          applyTheme("light");
+        }
       }
 
       initializeApp();
