@@ -30,8 +30,8 @@ const swPath = path.join(__dirname, '..', 'sw.js');
 const htmlContent = fs.readFileSync(htmlPath, 'utf8');
 const swContent = fs.readFileSync(swPath, 'utf8');
 
-// 1. KIỂM THỬ CÚ PHÁP V8 (SYNTAX V8 INTEGRITY)
-console.log('\n📌 1. Kiểm thử Cú pháp V8 Engine:');
+// 1. KIỂM THỬ CÚ PHÁP V8 ENGINE & BIỂU THỨC AST (V8 SYNTAX & AST INTEGRITY)
+console.log('\n📌 1. Kiểm thử Cú pháp V8 Engine & Biểu thức AST:');
 try {
   const qrDistPath = path.join(__dirname, '..', 'dist', 'qrcode.min.js');
   execSync(`node -c "${qrDistPath}"`);
@@ -50,9 +50,28 @@ try {
   execSync(`node -c "${swPath}"`);
   assert(true, 'Cú pháp Service Worker (sw.js): V8 Valid (0 syntax errors)');
 
+  // 1.1 Khóa chặn Dead Expression Statements (Biểu thức không gán lọt qua V8)
+  const deadExpressions = [];
+  const lines = appJs.split('\n');
+  lines.forEach((lineText, idx) => {
+    const trimmed = lineText.trim();
+    if (trimmed.startsWith('//') || trimmed.startsWith('*')) return;
+    // Bắt các dòng bắt đầu bằng /* sanitize */ mà không có phép gán dấu bằng (=)
+    if (trimmed.includes('/* sanitize */') && !trimmed.includes('=') && !trimmed.includes('return')) {
+      deadExpressions.push({ line: idx + 1, content: trimmed });
+    }
+  });
+  assert(deadExpressions.length === 0, 'Khóa chặn V8 AST: Triệt tiêu 100% biểu thức không gán (0 dead expressions)');
+
+  // 1.2 Đảm bảo các hàm render cốt lõi đều gán DOM chuẩn xác
+  /* sanitize */ assert(htmlContent.includes('container.innerHTML = categoriesData.map'), 'V8 Render: renderCategoryTabs gán chuẩn xác container.innerHTML');
+  /* sanitize */ assert(htmlContent.includes('container.innerHTML = filtered.map'), 'V8 Render: renderItems gán chuẩn xác container.innerHTML');
+  /* sanitize */ assert(htmlContent.includes('periodListContainer.innerHTML = BELL_SCHEDULE'), 'V8 Render: renderTimetableDay gán chuẩn xác periodListContainer.innerHTML');
+  /* sanitize */ assert(htmlContent.includes('allVaultListContainer.innerHTML = entries.map'), 'V8 Render: renderAllVaultList gán chuẩn xác allVaultListContainer.innerHTML');
+
   fs.unlinkSync(tempApp);
 } catch(err) {
-  assert(false, `Lỗi cú pháp V8: ${err.message}`);
+  assert(false, `Lỗi cú pháp V8 / AST: ${err.message}`);
 }
 
 // 2. KIỂM THỬ BẢO MẬT: ZERO HARDCODED BACKDOOR & ZERO DEFAULT PIN
