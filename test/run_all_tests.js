@@ -1947,6 +1947,7 @@ console.log('\n📌 7.4 Kiểm thử Thực tế Web Crypto AES-256-GCM PBKDF2 V
 await (async () => {
   try {
     const { webcrypto } = require('crypto');
+    const vm = require('vm');
     const mEnc = appJs.match(/async function encryptVaultPayload[\s\S]*?\n      \}/);
     const mDec = appJs.match(/async function decryptVaultPayload[\s\S]*?\n      \}/);
     const mDerive = appJs.match(/async function deriveVaultKey[\s\S]*?\n      \}/);
@@ -1955,11 +1956,25 @@ await (async () => {
       const sandboxVaultCrypto = {
         PBKDF2_ROUNDS: 100000,
         window: { crypto: webcrypto },
+        TextEncoder,
+        TextDecoder,
+        Uint8Array,
+        btoa,
+        atob,
+        JSON,
+        String,
+        Array,
+        parseInt,
         console: { log: () => {}, warn: () => {}, error: () => {} }
       };
       const scriptVaultCrypto = new vm.Script(
         'let PBKDF2_ROUNDS = this.PBKDF2_ROUNDS;\n' +
         'let window = this.window;\n' +
+        'let TextEncoder = this.TextEncoder;\n' +
+        'let TextDecoder = this.TextDecoder;\n' +
+        'let Uint8Array = this.Uint8Array;\n' +
+        'let btoa = this.btoa;\n' +
+        'let atob = this.atob;\n' +
         mDerive[0] + '\n' +
         mEnc[0] + '\n' +
         mDec[0] + '\n' +
