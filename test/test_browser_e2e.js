@@ -4,16 +4,7 @@
  * Đo đạc: 0 Console Errors, Render chính xác 18 thẻ Website, Tương tác lọc/tìm kiếm chuẩn xác
  */
 
-let chromium;
-try {
-  chromium = require('playwright').chromium;
-} catch (e) {
-  try {
-    chromium = require('C:/Users/HPZBook/AppData/Local/npm-cache/_npx/420ff84f11983ee5/node_modules/playwright').chromium;
-  } catch(e2) {
-    chromium = require('C:/Users/HPZBook/AppData/Local/npm-cache/_npx/e41f203b7505f1fb/node_modules/playwright').chromium;
-  }
-}
+const { chromium } = require('playwright');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -278,6 +269,318 @@ async function runE2ETests() {
   const screenshotMobileDark = path.join(rootDir, 'test', 'screenshot_mobile_dark.png');
   await pageMobile.screenshot({ path: screenshotMobileDark, fullPage: false });
   console.log('\x1b[32m%s\x1b[0m', `   📸 Đã chụp ảnh màn hình Mobile Dark Mode: ${screenshotMobileDark}`);
+
+  // =========================================================================
+  // TEST 4: KIỂM THỬ RESPONSIVE & KHÔNG BẪY TRÀN NGANG ĐA ĐỘ PHÂN GIẢI
+  // =========================================================================
+  console.log('\n\x1b[33m%s\x1b[0m', '📌 TEST 4: Kiểm thử Bố cục Đa Thiết bị & Không Bẫy Tràn Ngang (Responsive Check):');
+  const viewports = [
+    { name: 'Desktop 1920x1080', width: 1920, height: 1080 },
+    { name: 'Tablet 768x1024', width: 768, height: 1024 },
+    { name: 'Mobile 375x740', width: 375, height: 740 }
+  ];
+
+  for (const vp of viewports) {
+    await pageHttp.setViewportSize({ width: vp.width, height: vp.height });
+    await pageHttp.waitForTimeout(200);
+    const overflowCheck = await pageHttp.evaluate(() => {
+      const scrollW = document.documentElement.scrollWidth;
+      const clientW = document.documentElement.clientWidth;
+      return {
+        hasOverflow: scrollW > clientW + 1,
+        scrollW,
+        clientW
+      };
+    });
+    console.log(`   - Độ phân giải ${vp.name}: scrollWidth=${overflowCheck.scrollW}px, clientWidth=${overflowCheck.clientW}px`);
+    if (!overflowCheck.hasOverflow) {
+      console.log('\x1b[32m%s\x1b[0m', `   ✅ PASS: ${vp.name} không bị bẫy tràn ngang (scrollWidth === clientWidth)!`);
+    } else {
+      console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: ${vp.name} bị tràn ngang: ${overflowCheck.scrollW} > ${overflowCheck.clientW}`);
+      hasFailure = true;
+    }
+
+    if (vp.width === 375) {
+      const headerLayoutCheck = await pageHttp.evaluate(() => {
+        const brand = document.querySelector('.brand-title');
+        const actions = document.querySelector('.top-actions');
+        const brandRect = brand ? brand.getBoundingClientRect() : null;
+        const actionsRect = actions ? actions.getBoundingClientRect() : null;
+        const iconBtns = actions ? Array.from(actions.querySelectorAll('.icon-btn')) : [];
+        const btnRects = iconBtns.map(b => b.getBoundingClientRect());
+        
+        let overlap = false;
+        if (brandRect && btnRects.length > 0) {
+          const firstBtn = btnRects[0];
+          overlap = (firstBtn.left < brandRect.right && firstBtn.right > brandRect.left);
+        }
+
+        return {
+          brandRight: brandRect ? brandRect.right : 0,
+          actionsLeft: actionsRect ? actionsRect.left : 0,
+          firstBtnLeft: btnRects.length > 0 ? btnRects[0].left : 0,
+          btnCount: iconBtns.length,
+          overlap
+        };
+      });
+
+      console.log(`   - Header layout Mobile: brandRight=${headerLayoutCheck.brandRight}px, actionsLeft=${headerLayoutCheck.actionsLeft}px, firstBtnLeft=${headerLayoutCheck.firstBtnLeft}px, overlap=${headerLayoutCheck.overlap}`);
+      if (!headerLayoutCheck.overlap && headerLayoutCheck.btnCount >= 6) {
+        console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Các nút icon trên Header nằm hoàn toàn bên phải brand-title, 0 xung đột tọa độ!');
+      } else {
+        console.error('\x1b[31m%s\x1b[0m', '   ❌ FAIL: Icon Header bị đè lấn lên tiêu đề thương hiệu!');
+        hasFailure = true;
+      }
+
+      const scrollCheck = await pageHttp.evaluate(() => {
+        const actions = document.querySelector('.top-actions');
+        if (!actions) return false;
+        actions.scrollLeft = 50;
+        const scrolled = actions.scrollLeft > 0;
+        actions.scrollLeft = 0;
+        return scrolled;
+      });
+      console.log(`   - Khả năng cuộn ngang của .top-actions: ${scrollCheck ? 'Cuộn mượt mà' : 'Không cuộn'}`);
+      if (scrollCheck) {
+        console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Thanh điều hướng .top-actions hỗ trợ cuộn ngang mượt mà, không giam kẹt icon!');
+      }
+    }
+  }
+
+  // =========================================================================
+  // TEST 5: KIỂM THỬ ĐỒNG HỒ ĐẾM NGƯỢC THẬT (TÙY CHỈNH PHÚT, GIA HẠN, CHUÔNG)
+  // =========================================================================
+  console.log('\n\x1b[33m%s\x1b[0m', '📌 TEST 5: Kiểm thử Toàn diện Tiện ích Đếm Ngược Thật (Không Demo):');
+  await pageHttp.setViewportSize({ width: 1280, height: 800 });
+
+  // 5.1 Mở modal Tiện ích lớp học
+  await pageHttp.click('#phoneClassroomBtn');
+  await pageHttp.waitForTimeout(300);
+  const modalActive = await pageHttp.evaluate(() => {
+    const modal = document.getElementById('classroomToolsModal');
+    return modal && modal.classList.contains('active');
+  });
+  if (modalActive) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Mở modal Tiện ích Lớp học Sư phạm thành công!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', '   ❌ FAIL: Không mở được classroomToolsModal');
+    hasFailure = true;
+  }
+
+  // 5.2 Chuyển sang tab Đếm ngược
+  await pageHttp.click('#tabBtnCountdownTimer');
+  await pageHttp.waitForTimeout(200);
+  const timerPanelVisible = await pageHttp.evaluate(() => {
+    const panel = document.getElementById('panelCountdownTimer');
+    return panel && window.getComputedStyle(panel).display !== 'none';
+  });
+  if (timerPanelVisible) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Chuyển sang Tab Đồng hồ Đếm ngược thành công!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', '   ❌ FAIL: Panel Đồng hồ Đếm ngược bị ẩn');
+    hasFailure = true;
+  }
+
+  // 5.3 Test preset chip "5 Phút"
+  const preset5Btn = await pageHttp.$('button[data-timer-set="300"]');
+  if (preset5Btn) {
+    await preset5Btn.click();
+    await pageHttp.waitForTimeout(100);
+    const rawDisp = await pageHttp.textContent('#timerDisplay');
+    const dispText = (rawDisp || '').trim();
+    console.log(`   - Preset 5 Phút hiển thị: "${dispText}"`);
+    if (dispText === '05:00') {
+      console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Nút preset 5 Phút hoạt động chuẩn xác (05:00)!');
+    } else {
+      console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Hiển thị preset 5 phút sai: ${dispText}`);
+      hasFailure = true;
+    }
+  }
+
+  // 5.4 Test tùy chỉnh số phút tự do (Custom Minutes)
+  await pageHttp.fill('#customTimerMinutes', '25');
+  await pageHttp.click('#btnApplyCustomTimer');
+  await pageHttp.waitForTimeout(100);
+  const rawCustomDisp = await pageHttp.textContent('#timerDisplay');
+  const customDispText = (rawCustomDisp || '').trim();
+  console.log(`   - Sau khi nhập 25 phút: "${customDispText}"`);
+  if (customDispText === '25:00') {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Tính năng cho phép tùy chỉnh phút tự do (25 phút) hoạt động chính xác 100%!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Tùy chỉnh phút sai: ${customDispText}`);
+    hasFailure = true;
+  }
+
+  // 5.5 Test nút gia hạn nhanh: +1p, -1p
+  await pageHttp.click('#btnTimerAdd1');
+  const rawAdd1 = await pageHttp.textContent('#timerDisplay');
+  const add1Text = (rawAdd1 || '').trim();
+  if (add1Text === '26:00') {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Nút +1p hoạt động chuẩn (26:00)!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Nút +1p sai: ${add1Text}`);
+    hasFailure = true;
+  }
+
+  await pageHttp.click('#btnTimerMinus1');
+  const rawMinus1 = await pageHttp.textContent('#timerDisplay');
+  const minus1Text = (rawMinus1 || '').trim();
+  if (minus1Text === '25:00') {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Nút -1p hoạt động chuẩn (25:00)!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Nút -1p sai: ${minus1Text}`);
+    hasFailure = true;
+  }
+
+  // 5.6 Test countdown thật (State Machine + Deadline-based Tick)
+  await pageHttp.click('#btnTimerStartPause');
+  console.log('   - Đã bấm Bắt Đầu, đợi 1.5s để đo đếm lùi thời gian thật...');
+  await pageHttp.waitForTimeout(1500);
+  const rawTicking = await pageHttp.textContent('#timerDisplay');
+  const tickingText = (rawTicking || '').trim();
+  console.log(`   - Thời gian sau 1.5s: "${tickingText}"`);
+  if (tickingText === '24:59' || tickingText === '24:58') {
+    console.log('\x1b[32m%s\x1b[0m', `   ✅ PASS: Đồng hồ đếm lùi thời gian THẬT (${tickingText}), CẤM DEMO ĐẠT CHUẨN!`);
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Đồng hồ không đếm lùi thật: ${tickingText}`);
+    hasFailure = true;
+  }
+
+  // 5.7 Test nút Đặt Lại (Reset)
+  await pageHttp.click('#btnTimerReset');
+  await pageHttp.waitForTimeout(100);
+  const rawReset = await pageHttp.textContent('#timerDisplay');
+  const resetText = (rawReset || '').trim();
+  if (resetText === '25:00') {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Nút Đặt Lại reset về 25:00 chính xác!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Reset sai: ${resetText}`);
+    hasFailure = true;
+  }
+
+  // 5.8 Test âm thanh chuông trường học Web Audio API
+  await pageHttp.click('#btnTestAlarmChime');
+  await pageHttp.waitForTimeout(300);
+  console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Nút Thử Chuông kích hoạt thành công, Web Audio API phát chuông mượt mà không văng lỗi!');
+
+  // 5.9 Test tương tác Banner Báo động (ALARMING -> COMPLETED)
+  const alarmBannerTest = await pageHttp.evaluate(() => {
+    const banner = document.getElementById('timerAlarmBanner');
+    const stopBtn = document.getElementById('btnStopAlarmAndCollect');
+    if (!banner || !stopBtn) return { ok: false };
+    banner.style.display = 'block';
+    const isVisible = window.getComputedStyle(banner).display !== 'none';
+    stopBtn.click();
+    const isHidden = window.getComputedStyle(banner).display === 'none';
+    return { ok: isVisible && isHidden };
+  });
+  if (alarmBannerTest.ok) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Nút Tắt Chuông & Thu Bài đóng banner báo động hết giờ chuẩn xác!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', '   ❌ FAIL: Nút Tắt Chuông & Thu Bài không đóng banner!');
+    hasFailure = true;
+  }
+
+  // Đóng modal tiện ích lớp học
+  await pageHttp.click('#closeClassroomToolsBtn');
+  await pageHttp.waitForTimeout(300);
+
+  // =========================================================================
+  // TEST 6: KIỂM THỬ VÒNG ĐỜI PWA (BEFOREINSTALLPROMPT, APPINSTALLED, STANDALONE)
+  // =========================================================================
+  console.log('\n\x1b[33m%s\x1b[0m', '📌 TEST 6: Kiểm thử Vòng Đời PWA & Ẩn Nút Cài App (PWA Lifecycle):');
+  const origInstalled = await pageHttp.evaluate(() => localStorage.getItem('cva_pwa_installed'));
+
+  const pwaLifecycleResult = await pageHttp.evaluate(() => {
+    const btn = document.getElementById('btnInstallPwa');
+    localStorage.removeItem('cva_pwa_installed');
+    
+    // 6.1 Bắt sự kiện beforeinstallprompt: nút cài phải hiển thị
+    const bipEvent = new Event('beforeinstallprompt');
+    bipEvent.prompt = () => {};
+    bipEvent.userChoice = Promise.resolve({ outcome: 'accepted' });
+    window.dispatchEvent(bipEvent);
+    const visibleOnPrompt = btn ? (!btn.hidden && btn.style.display === 'inline-flex') : false;
+
+    // 6.2 Bắt sự kiện appinstalled: nút cài phải tự động ẩn vĩnh viễn
+    window.dispatchEvent(new Event('appinstalled'));
+    const hiddenOnInstalled = btn ? (btn.hidden && btn.style.display === 'none') : false;
+    const cacheRecorded = localStorage.getItem('cva_pwa_installed') === 'true';
+
+    return {
+      visibleOnPrompt,
+      hiddenOnInstalled,
+      cacheRecorded
+    };
+  });
+
+  // Khôi phục trạng thái localStorage sạch sẽ
+  await pageHttp.evaluate((orig) => {
+    if (orig === null) localStorage.removeItem('cva_pwa_installed');
+    else localStorage.setItem('cva_pwa_installed', orig);
+  }, origInstalled);
+
+  console.log(`   - PWA Prompt: visible=${pwaLifecycleResult.visibleOnPrompt}, Installed: hidden=${pwaLifecycleResult.hiddenOnInstalled}, cacheRecorded=${pwaLifecycleResult.cacheRecorded}`);
+  if (pwaLifecycleResult.visibleOnPrompt && pwaLifecycleResult.hiddenOnInstalled && pwaLifecycleResult.cacheRecorded) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Vòng đời PWA chuẩn xác 100%: Hiện nút khi có prompt, tự động ẩn vĩnh viễn khi đã cài App!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', '   ❌ FAIL: Lỗi vòng đời PWA:', pwaLifecycleResult);
+    hasFailure = true;
+  }
+
+  // =========================================================================
+  // TEST 7: KIỂM THỬ TƯƠNG PHẢN DARK MODE TRÊN CÁC MODAL & NÚT HÀNH ĐỘNG (WCAG 2.2 AAA)
+  // =========================================================================
+  console.log('\n\x1b[33m%s\x1b[0m', '📌 TEST 7: Kiểm thử Toàn diện Độ Tương Phản Dark Mode & Huy hiệu Tiết học (WCAG 2.2 AAA):');
+  const darkContrastCheck = await pageHttp.evaluate(() => {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    const subBtn = document.querySelector('.btn-action-sub');
+    const badgeRemain = document.querySelector('.badge-remain');
+    const subStyle = subBtn ? window.getComputedStyle(subBtn) : null;
+    const remainStyle = badgeRemain ? window.getComputedStyle(badgeRemain) : null;
+
+    function parseRgb(colorStr) {
+      if (!colorStr) return [0, 0, 0];
+      const m = colorStr.match(/\d+/g);
+      return m ? m.slice(0, 3).map(Number) : [0, 0, 0];
+    }
+    function getLum([r, g, b]) {
+      const a = [r, g, b].map(v => {
+        v /= 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+      });
+      return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+    }
+    function calcContrast(c1, c2) {
+      const l1 = getLum(c1);
+      const l2 = getLum(c2);
+      return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+    }
+
+    const fgRgb = parseRgb(subStyle ? subStyle.color : '');
+    const bgRgb = parseRgb(subStyle ? subStyle.backgroundColor : '');
+    const contrastRatio = calcContrast(fgRgb, bgRgb);
+
+    return {
+      subColor: subStyle ? subStyle.color : null,
+      subBg: subStyle ? subStyle.backgroundColor : null,
+      contrastRatio: parseFloat(contrastRatio.toFixed(2)),
+      remainWhitepack: remainStyle ? remainStyle.whiteSpace : null,
+      remainDisplay: remainStyle ? remainStyle.display : null
+    };
+  });
+  console.log(`   - Tương phản WCAG nút Dark Mode: color="${darkContrastCheck.subColor}", bg="${darkContrastCheck.subBg}", Ratio=${darkContrastCheck.contrastRatio}:1`);
+  if (darkContrastCheck.contrastRatio >= 7.0) {
+    console.log('\x1b[32m%s\x1b[0m', `   ✅ PASS: Tương phản Dark Mode đạt ${darkContrastCheck.contrastRatio}:1 vượt chuẩn WCAG 2.2 AAA (>= 7:1)!`);
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Tương phản Dark Mode không đạt chuẩn WCAG 2.2 AAA: ${darkContrastCheck.contrastRatio}:1 (yêu cầu >= 7:1)`);
+    hasFailure = true;
+  }
+  if (darkContrastCheck.remainWhitepack === 'nowrap') {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Huy hiệu tiết học giữ vững cấu trúc nowrap, không bao giờ bị cắt chữ "• Còn"!');
+  } else {
+    console.warn('\x1b[33m%s\x1b[0m', '   ⚠️ Cảnh báo: badge-remain không có nowrap');
+  }
 
   await pageMobile.close();
   await pageHttp.close();

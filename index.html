@@ -43,6 +43,7 @@
     }
 
     [data-theme="dark"] {
+      color-scheme: dark;
       --bg: #090d16;
       --card-bg: #131b2b;
       --card-border: #222f44;
@@ -237,16 +238,17 @@
       .brand-group {
         gap: 6px;
         flex-shrink: 0;
+        min-width: 0;
       }
       .brand-badge {
-        width: 32px;
-        height: 32px;
-        min-width: 32px;
-        border-radius: 8px;
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+        border-radius: 9px;
       }
       .brand-badge svg {
-        width: 17px;
-        height: 17px;
+        width: 18px;
+        height: 18px;
       }
       .brand-title {
         font-size: 0.88rem;
@@ -256,46 +258,40 @@
         display: none !important;
       }
       .top-actions {
-        gap: 4px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        flex: 1;
+        justify-content: flex-start;
         overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scroll-snap-type: x proximity;
+        padding: 2px 4px;
+        padding-inline-start: max(4px, env(safe-area-inset-left, 0px));
+        padding-inline-end: max(6px, env(safe-area-inset-right, 0px));
         scrollbar-width: none;
         -webkit-overflow-scrolling: touch;
-        padding: 2px 0;
-        max-width: calc(100% - 110px);
       }
       .top-actions::-webkit-scrollbar {
         display: none;
       }
       .icon-btn {
-        width: 34px;
-        height: 34px;
-        min-width: 34px;
-        border-radius: 8px;
+        flex: 0 0 44px;
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        border-radius: var(--radius-md);
+        scroll-snap-align: start;
         flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
       }
       .icon-btn svg {
-        width: 17px;
-        height: 17px;
-      }
-    }
-
-    @media (max-width: 360px) {
-      .brand-title {
-        font-size: 0.82rem;
-      }
-      .brand-badge {
-        width: 30px;
-        height: 30px;
-        min-width: 30px;
-      }
-      .icon-btn {
-        width: 32px;
-        height: 32px;
-        min-width: 32px;
-      }
-      .top-actions {
-        gap: 3px;
-        max-width: calc(100% - 95px);
+        width: 19px;
+        height: 19px;
+        pointer-events: none;
       }
     }
 
@@ -363,10 +359,11 @@
       flex-shrink: 0;
     }
 
-    #pedagogicalBellBadge {
+    #pedagogicalBellBadge,
+    .bell-badge {
       display: none;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
       background: var(--primary-light);
       color: var(--primary);
       font-size: 0.74rem;
@@ -374,16 +371,43 @@
       padding: 3px 10px;
       border-radius: var(--radius-full);
       cursor: pointer;
-      white-space: nowrap;
       border: 1px solid rgba(37, 99, 235, 0.25);
       transition: all 0.15s ease;
+      min-width: 0;
+      max-width: 100%;
+      user-select: none;
+    }
+
+    .badge-icon,
+    .badge-sep,
+    .badge-remain {
+      flex: 0 0 auto !important;
+      white-space: nowrap !important;
+      font-weight: 800;
+    }
+
+    .badge-title {
+      min-width: 0;
+      flex: 0 1 auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 130px;
+    }
+
+    .badge-time {
+      flex: 0 0 auto;
+      white-space: nowrap;
+      opacity: 0.85;
+      font-size: 0.70rem;
     }
 
     [data-theme="dark"] .greeting-left {
       color: #93c5fd;
     }
 
-    [data-theme="dark"] #pedagogicalBellBadge {
+    [data-theme="dark"] #pedagogicalBellBadge,
+    [data-theme="dark"] .bell-badge {
       background: rgba(59, 130, 246, 0.22) !important;
       color: #bfdbfe !important;
       border-color: rgba(59, 130, 246, 0.35) !important;
@@ -400,6 +424,7 @@
         justify-content: space-between;
         gap: 4px;
         font-size: 0.80rem;
+        min-width: 0;
       }
       .greeting-right {
         width: 100%;
@@ -408,12 +433,17 @@
         padding-top: 4px;
         border-top: 1px dashed var(--card-border);
       }
-      #pedagogicalBellBadge {
+      .badge-time {
+        display: none !important;
+      }
+      .badge-title {
+        max-width: 85px;
+      }
+      #pedagogicalBellBadge,
+      .bell-badge {
         font-size: 0.72rem;
         padding: 2px 8px;
-        max-width: 60%;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        flex-shrink: 0;
       }
     }
 
@@ -1113,10 +1143,34 @@
       color: #ffffff;
     }
 
-    .btn-action-cancel {
+    .btn-action-cancel,
+    .btn-action-sub {
       background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      color: var(--text-sub);
+      border: 1.5px solid var(--card-border);
+      color: var(--text-main);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-action-cancel:hover,
+    .btn-action-sub:hover {
+      background: var(--card-hover);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    [data-theme="dark"] .btn-action-cancel,
+    [data-theme="dark"] .btn-action-sub {
+      background: #1e293b;
+      border-color: #334155;
+      color: #f8fafc;
+    }
+
+    [data-theme="dark"] .btn-action-cancel:hover,
+    [data-theme="dark"] .btn-action-sub:hover {
+      background: #334155;
+      border-color: #60a5fa;
+      color: #ffffff;
     }
 
     /* ==========================================================================
@@ -1786,6 +1840,35 @@
       transform: scale(0.95);
     }
 
+    .btn-timer-chip.active {
+      background: var(--primary) !important;
+      color: #ffffff !important;
+      border-color: var(--primary) !important;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+    }
+
+    [data-theme="dark"] .btn-timer-chip {
+      background: #1e293b;
+      border-color: #334155;
+      color: #cbd5e1;
+    }
+
+    [data-theme="dark"] .btn-timer-chip:hover {
+      background: #334155;
+      color: #ffffff;
+      border-color: #60a5fa;
+    }
+
+    /* Accessibility Focus Ring (WCAG 2.2) */
+    button:focus-visible,
+    .icon-btn:focus-visible,
+    .category-pill:focus-visible,
+    .btn-timer-chip:focus-visible,
+    .btn-action:focus-visible {
+      outline: 3px solid var(--primary);
+      outline-offset: 2px;
+    }
+
     .urgent-reminder-banner {
       background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(239, 68, 68, 0.12));
       border: 1.5px solid rgba(245, 158, 11, 0.45);
@@ -2172,10 +2255,16 @@
       <div class="greeting-left">
         <span>☀️</span>
         <span id="quickGreeting">Chào buổi sáng, Thầy/Cô!</span>
-        <div id="pedagogicalBellBadge" style="display:none; align-items:center; gap:5px; background:var(--primary-light); color:var(--primary); font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:var(--radius-full); cursor:pointer;" title="Bấm để xem Thời khóa biểu">🔔 Đang tải tiết...</div>
+        <div id="pedagogicalBellBadge" class="bell-badge" style="display:none;" title="Bấm để xem Thời khóa biểu">
+          <span class="badge-icon">🔔</span>
+          <span class="badge-title" id="badgeLessonTitle">Đang tải...</span>
+          <span class="badge-time" id="badgeLessonTime"></span>
+          <span class="badge-sep">•</span>
+          <span class="badge-remain" id="badgeLessonRemain">--</span>
+        </div>
       </div>
       <div class="greeting-right">
-        <button id="btnInstallPwa" class="btn-install-pwa" title="Cài ứng dụng vào điện thoại để mở nhanh và dùng offline">
+        <button id="btnInstallPwa" class="btn-install-pwa" title="Cài ứng dụng vào điện thoại để mở nhanh và dùng offline" hidden>
           <span>📲 Cài App</span>
         </button>
         <button type="button" class="clock-right" id="miniClock" title="⏰ Bấm để mở Lịch Nhắc Việc & Hẹn Giờ Sư Phạm">--:--</button>
@@ -3241,18 +3330,59 @@
 
         <!-- PHẦN 2: ĐỒNG HỒ ĐẾM NGƯỢC LÀM BÀI / THI ĐẤU -->
         <div id="panelCountdownTimer" style="display: none; text-align: center;">
-          <div style="font-size: 3.2rem; font-weight: 900; font-family: monospace; color: var(--primary); letter-spacing: 2px; padding: 16px 0;" id="timerDisplay">
+          <!-- Đồng hồ số lớn -->
+          <div style="font-size: 3.2rem; font-weight: 900; font-family: monospace; color: var(--primary); letter-spacing: 2px; padding: 12px 0; transition: color 0.2s ease;" id="timerDisplay">
             15:00
           </div>
-          <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 14px;">
+
+          <!-- BANNER BÁO ĐỘNG HẾT GIỜ (ROLE=ALERT) -->
+          <div id="timerAlarmBanner" role="alert" aria-live="assertive" style="display: none; background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(245, 158, 11, 0.15)); border: 2px solid #ef4444; border-radius: var(--radius-md); padding: 12px; margin-bottom: 14px; text-align: center;">
+            <div style="font-weight: 800; font-size: 1rem; color: #dc2626; margin-bottom: 8px;">
+              🔔 ĐÃ HẾT GIỜ LÀM BÀI! Thầy/Cô thông báo học sinh dừng bút nộp bài.
+            </div>
+            <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;">
+              <button type="button" id="btnStopAlarmAndCollect" class="btn-action btn-action-primary" style="background: #dc2626; color: #ffffff; min-height: 40px; padding: 0 16px; font-size: 0.85rem;">
+                ⏹ Tắt Chuông & Thu Bài
+              </button>
+              <button type="button" id="btnReplayAlarmBell" class="btn-action btn-action-sub" style="min-height: 40px; padding: 0 14px; font-size: 0.85rem;">
+                🔊 Phát Lại Chuông
+              </button>
+            </div>
+          </div>
+
+          <!-- HÀNG NÚT PRESET THỜI GIAN (EVENT DELEGATION) -->
+          <div id="timerPresetContainer" style="display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
             <button type="button" class="btn-timer-chip" data-timer-set="300">5 Phút</button>
             <button type="button" class="btn-timer-chip" data-timer-set="600">10 Phút</button>
             <button type="button" class="btn-timer-chip active" data-timer-set="900">15 Phút</button>
             <button type="button" class="btn-timer-chip" data-timer-set="2700">45 Phút (1 Tiết)</button>
           </div>
-          <div style="display: flex; justify-content: center; gap: 10px;">
-            <button type="button" class="btn-action btn-action-primary" id="btnTimerStartPause" style="min-width: 130px; font-size: 0.95rem;">▶ Bắt Đầu</button>
-            <button type="button" class="btn-action btn-action-sub" id="btnTimerReset" style="min-width: 100px;">🔄 Đặt Lại</button>
+
+          <!-- HÀNG NHẬP PHÚT TÙY CHỈNH & GIA HẠN NHANH -->
+          <div style="display: flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; padding: 8px; background: var(--bg); border: 1px solid var(--card-border); border-radius: var(--radius-md);">
+            <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-sub);">Chỉnh phút:</span>
+            <input type="number" id="customTimerMinutes" min="1" max="180" value="15" style="width: 65px; height: 36px; text-align: center; border-radius: var(--radius-sm); border: 1.5px solid var(--card-border); background: var(--card-bg); color: var(--text-main); font-weight: 800; font-size: 0.92rem;" placeholder="Phút">
+            <button type="button" id="btnApplyCustomTimer" class="btn-action btn-action-sub" style="min-height: 36px; padding: 0 12px; font-size: 0.82rem;">
+              ⏱️ Đặt Giờ
+            </button>
+            <div style="display: flex; gap: 4px; margin-left: 4px;">
+              <button type="button" id="btnTimerMinus1" class="btn-timer-chip" style="padding: 4px 8px;" title="Bớt 1 phút">- 1p</button>
+              <button type="button" id="btnTimerAdd1" class="btn-timer-chip" style="padding: 4px 8px;" title="Thêm 1 phút">+ 1p</button>
+              <button type="button" id="btnTimerAdd5" class="btn-timer-chip" style="padding: 4px 8px;" title="Thêm 5 phút thi đua">+ 5p</button>
+            </div>
+          </div>
+
+          <!-- HÀNG NÚT ĐIỀU KHIỂN CHÍNH -->
+          <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn-action btn-action-primary" id="btnTimerStartPause" style="min-width: 130px; font-size: 0.95rem;">
+              ▶ Bắt Đầu
+            </button>
+            <button type="button" class="btn-action btn-action-sub" id="btnTimerReset" style="min-width: 100px;">
+              🔄 Đặt Lại
+            </button>
+            <button type="button" class="btn-action btn-action-sub" id="btnTestAlarmChime" style="min-width: 110px;" title="Kiểm tra âm lượng loa máy chiếu / phòng học">
+              🔔 Thử Chuông
+            </button>
           </div>
         </div>
       </div>
@@ -3708,6 +3838,9 @@
             return {
               active: true,
               item,
+              title: item.name,
+              timeRange: `(${item.start} - ${item.end})`,
+              remain: `Còn ${remain}p`,
               text: `${item.name} (${item.start} - ${item.end}) • Còn ${remain}p`,
               isRecess: item.isRecess
             };
@@ -3716,13 +3849,13 @@
 
         // Nếu ngoài giờ học
         if (currentMins < timeToMinutes("07:00")) {
-          return { active: false, text: "Chuẩn bị vào Tiết 1 lúc 07:00 sáng" };
+          return { active: false, title: "Chuẩn bị vào Tiết 1 lúc 07:00", text: "Chuẩn bị vào Tiết 1 lúc 07:00 sáng" };
         } else if (currentMins >= timeToMinutes("11:20") && currentMins < timeToMinutes("13:30")) {
-          return { active: false, text: "Giờ nghỉ trưa sư phạm (Vào chiều 13:30)" };
+          return { active: false, title: "Giờ nghỉ trưa sư phạm", timeRange: "(Vào chiều 13:30)", text: "Giờ nghỉ trưa sư phạm (Vào chiều 13:30)" };
         } else if (currentMins >= timeToMinutes("17:50")) {
-          return { active: false, text: "Hết giờ giảng dạy chính khóa" };
+          return { active: false, title: "Hết giờ giảng dạy chính khóa", text: "Hết giờ giảng dạy chính khóa" };
         }
-        return { active: false, text: "Thời khóa biểu sư phạm" };
+        return { active: false, title: "Thời khóa biểu sư phạm", text: "Thời khóa biểu sư phạm" };
       }
 
       function updateClockAndGreeting() {
@@ -3760,9 +3893,27 @@
         if (bellBadge) {
           const bell = getCurrentBellStatus();
           bellBadge.style.display = "inline-flex";
-          bellBadge.textContent = "🔔 " + bell.text;
           bellBadge.style.background = bell.isRecess ? "var(--accent-light)" : "var(--primary-light)";
           bellBadge.style.color = bell.isRecess ? "var(--accent)" : "var(--primary)";
+
+          const titleEl = document.getElementById("badgeLessonTitle");
+          const timeEl = document.getElementById("badgeLessonTime");
+          const remainEl = document.getElementById("badgeLessonRemain");
+          const sepEl = bellBadge.querySelector(".badge-sep");
+
+          if (titleEl) titleEl.textContent = bell.title || bell.text;
+          if (timeEl) timeEl.textContent = bell.timeRange || "";
+          if (remainEl) {
+            if (bell.remain) {
+              remainEl.textContent = bell.remain;
+              remainEl.style.display = "inline";
+              if (sepEl) sepEl.style.display = "inline";
+            } else {
+              remainEl.textContent = "";
+              remainEl.style.display = "none";
+              if (sepEl) sepEl.style.display = "none";
+            }
+          }
         }
       }
 
@@ -5871,24 +6022,100 @@
       // 18. PWA INSTALLATION, SERVICE WORKER & SEAMLESS AUTO-UPDATE
       // ==========================================================================
       let deferredInstallPrompt = null;
+
+      function getPwaEnvironment() {
+        const isStandalone = (window.matchMedia && (
+          window.matchMedia('(display-mode: standalone)').matches ||
+          window.matchMedia('(display-mode: fullscreen)').matches ||
+          window.matchMedia('(display-mode: minimal-ui)').matches
+        )) || (window.navigator.standalone === true);
+
+        const isIOS = (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream) ||
+                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+        return { isStandalone, isIOS };
+      }
+
+      function handleInstallPwaClick() {
+        const { isStandalone, isIOS } = getPwaEnvironment();
+        if (isStandalone) return;
+        if (isIOS) {
+          showToast("📲 Hướng dẫn iOS: Bấm Chia sẻ (⎋) ở Safari -> chọn 'Thêm vào Màn hình chính' (➕)", "info");
+          return;
+        }
+        if (deferredInstallPrompt) {
+          deferredInstallPrompt.prompt();
+          deferredInstallPrompt.userChoice.then((choice) => {
+            if (choice && choice.outcome === "accepted") {
+              deferredInstallPrompt = null;
+              localStorage.setItem("cva_pwa_installed", "true");
+              updateInstallButtonVisibility();
+              showToast("🎉 Ứng dụng đã được cài đặt vào màn hình chính!");
+            }
+          }).catch((err) => {
+            console.warn("[PWA] Lỗi xử lý userChoice:", err);
+          });
+        }
+      }
+
+      const btnInstallPwaEl = document.getElementById("btnInstallPwa");
+      if (btnInstallPwaEl) {
+        btnInstallPwaEl.addEventListener("click", handleInstallPwaClick);
+      }
+
+      function updateInstallButtonVisibility() {
+        const btnInstallPwa = document.getElementById("btnInstallPwa");
+        if (!btnInstallPwa) return;
+        const { isStandalone, isIOS } = getPwaEnvironment();
+
+        const isPreviouslyInstalled = localStorage.getItem("cva_pwa_installed") === "true";
+        if (isStandalone || isPreviouslyInstalled) {
+          btnInstallPwa.hidden = true;
+          btnInstallPwa.style.display = "none";
+          return;
+        }
+
+        if (isIOS) {
+          btnInstallPwa.hidden = false;
+          btnInstallPwa.style.display = "inline-flex";
+          return;
+        }
+
+        if (deferredInstallPrompt) {
+          btnInstallPwa.hidden = false;
+          btnInstallPwa.style.display = "inline-flex";
+        } else {
+          btnInstallPwa.hidden = true;
+          btnInstallPwa.style.display = "none";
+        }
+      }
+
       window.addEventListener("beforeinstallprompt", (e) => {
         e.preventDefault();
         deferredInstallPrompt = e;
-        const btnInstallPwa = document.getElementById("btnInstallPwa");
-        if (btnInstallPwa) {
-          btnInstallPwa.style.display = "flex";
-          btnInstallPwa.onclick = async () => {
-            if (deferredInstallPrompt) {
-              deferredInstallPrompt.prompt();
-              const choice = await deferredInstallPrompt.userChoice;
-              if (choice && choice.outcome === "accepted") {
-                btnInstallPwa.style.display = "none";
-                deferredInstallPrompt = null;
-                showToast("🎉 Ứng dụng đã được cài đặt vào màn hình chính!");
-              }
-            }
-          };
-        }
+        updateInstallButtonVisibility();
+      });
+
+      window.addEventListener("appinstalled", () => {
+        deferredInstallPrompt = null;
+        localStorage.setItem("cva_pwa_installed", "true");
+        updateInstallButtonVisibility();
+      });
+
+      if (window.matchMedia) {
+        const mq = window.matchMedia('(display-mode: standalone)');
+        const mqHandler = (e) => {
+          if (e.matches) updateInstallButtonVisibility();
+        };
+        if (mq.addEventListener) mq.addEventListener('change', mqHandler);
+        else if (mq.addListener) mq.addListener(mqHandler);
+      }
+
+      // Khởi tạo kiểm tra ngay khi load
+      updateInstallButtonVisibility();
+      window.addEventListener('pageshow', updateInstallButtonVisibility);
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) updateInstallButtonVisibility();
       });
 
       // ==========================================================================
@@ -6512,6 +6739,12 @@
       }
 
       function closeClassroomTools() {
+        stopSchoolBell();
+        if (sharedAudioCtx && sharedAudioCtx.state === "running") {
+          sharedAudioCtx.suspend().catch((err) => {
+            console.warn("[WebAudio] Lỗi suspend AudioContext:", err);
+          });
+        }
         if (classroomToolsModal) classroomToolsModal.classList.remove("active");
       }
 
@@ -6578,73 +6811,405 @@
         });
       }
 
-      // ĐỒNG HỒ ĐẾM NGƯỢC LÀM BÀI / THI ĐẤU LỚP HỌC
-      let timerDuration = 900; // 15 phút mặc định
-      let timerRemaining = 900;
-      let timerInterval = null;
-      let isTimerRunning = false;
+      // ==========================================================================
+      // 20. ĐỒNG HỒ ĐẾM NGƯỢC SƯ PHẠM (FSM DEADLINE ARCHITECTURE & WEB AUDIO ENGINE)
+      // ==========================================================================
+      const TIMER_STATES = {
+        IDLE: 'IDLE',
+        RUNNING: 'RUNNING',
+        PAUSED: 'PAUSED',
+        COMPLETED: 'COMPLETED',
+        ALARMING: 'ALARMING'
+      };
+
+      const timerModel = {
+        state: TIMER_STATES.IDLE,
+        durationSec: 900,
+        remainingSec: 900,
+        targetEndTime: 0,
+        intervalId: null
+      };
 
       const timerDisplay = document.getElementById("timerDisplay");
       const btnTimerStartPause = document.getElementById("btnTimerStartPause");
       const btnTimerReset = document.getElementById("btnTimerReset");
+      const btnTestAlarmChime = document.getElementById("btnTestAlarmChime");
+      const customTimerMinutesInput = document.getElementById("customTimerMinutes");
+      const btnApplyCustomTimer = document.getElementById("btnApplyCustomTimer");
+      const btnTimerAdd1 = document.getElementById("btnTimerAdd1");
+      const btnTimerAdd5 = document.getElementById("btnTimerAdd5");
+      const btnTimerMinus1 = document.getElementById("btnTimerMinus1");
+      const timerAlarmBanner = document.getElementById("timerAlarmBanner");
+      const btnStopAlarmAndCollect = document.getElementById("btnStopAlarmAndCollect");
+      const btnReplayAlarmBell = document.getElementById("btnReplayAlarmBell");
+
+      // Web Audio Architecture
+      let sharedAudioCtx = null;
+      let activeAudioNodes = [];
+      let pendingTimeouts = new Set();
+      let bellSessionId = 0;
+
+      async function ensureAudioContext() {
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return null;
+          if (!sharedAudioCtx || sharedAudioCtx.state === "closed") {
+            sharedAudioCtx = new AudioCtx();
+          }
+          if (sharedAudioCtx.state === "suspended") {
+            await sharedAudioCtx.resume();
+          }
+          return sharedAudioCtx;
+        } catch (e) {
+          console.warn("[WebAudio] Lỗi kích hoạt AudioContext:", e);
+          return null;
+        }
+      }
+
+      function playSchoolBell() {
+        const currentSession = ++bellSessionId;
+        const ctx = sharedAudioCtx;
+        if (!ctx || ctx.state !== "running") return;
+
+        const notes = [
+          { freq: 880, delay: 0 },
+          { freq: 987, delay: 400 },
+          { freq: 1046, delay: 850 }
+        ];
+
+        notes.forEach(({ freq, delay }) => {
+          let tid = null;
+          tid = setTimeout(() => {
+            pendingTimeouts.delete(tid);
+            if (bellSessionId !== currentSession || !sharedAudioCtx || sharedAudioCtx.state !== "running") return;
+            try {
+              const now = sharedAudioCtx.currentTime;
+              const osc = sharedAudioCtx.createOscillator();
+              const gain = sharedAudioCtx.createGain();
+
+              osc.type = "sine";
+              osc.frequency.setValueAtTime(freq, now);
+
+              gain.gain.setValueAtTime(0.0001, now);
+              gain.gain.exponentialRampToValueAtTime(0.28, now + 0.02);
+              gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.65);
+
+              osc.connect(gain);
+              gain.connect(sharedAudioCtx.destination);
+
+              osc.start(now);
+              osc.stop(now + 0.68);
+
+              const nodePair = { osc, gain };
+              activeAudioNodes.push(nodePair);
+              osc.onended = () => {
+                activeAudioNodes = activeAudioNodes.filter(n => n !== nodePair);
+              };
+            } catch (err) {
+              console.warn("[WebAudio] Lỗi phát nốt:", err);
+            }
+          }, delay);
+
+          pendingTimeouts.add(tid);
+        });
+      }
+
+      function stopSchoolBell() {
+        bellSessionId++;
+        pendingTimeouts.forEach(tid => clearTimeout(tid));
+        pendingTimeouts.clear();
+
+        const now = sharedAudioCtx ? sharedAudioCtx.currentTime : 0;
+        activeAudioNodes.forEach(({ osc, gain }) => {
+          try {
+            if (gain && sharedAudioCtx) {
+              gain.gain.cancelScheduledValues(now);
+              gain.gain.setValueAtTime(gain.gain.value, now);
+              gain.gain.linearRampToValueAtTime(0.0001, now + 0.03);
+            }
+            let stopTid = null;
+            stopTid = setTimeout(() => {
+              pendingTimeouts.delete(stopTid);
+              try {
+                osc.stop();
+              } catch (oscErr) {
+                console.warn("[WebAudio] Oscillator đã dừng hoặc giải phóng:", oscErr);
+              }
+            }, 40);
+            pendingTimeouts.add(stopTid);
+          } catch (gainErr) {
+            console.warn("[WebAudio] Lỗi hủy node âm thanh:", gainErr);
+          }
+        });
+        activeAudioNodes = [];
+      }
 
       function updateTimerDisplay() {
         if (!timerDisplay) return;
-        const mins = Math.floor(timerRemaining / 60);
-        const secs = timerRemaining % 60;
+        const mins = Math.floor(timerModel.remainingSec / 60);
+        const secs = timerModel.remainingSec % 60;
         timerDisplay.textContent = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+
+        if (timerModel.remainingSec <= 10 && timerModel.state === TIMER_STATES.RUNNING) {
+          timerDisplay.style.color = "#ef4444";
+        } else {
+          timerDisplay.style.color = "var(--primary)";
+        }
       }
 
-      document.querySelectorAll("[data-timer-set]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          document.querySelectorAll("[data-timer-set]").forEach(b => b.classList.remove("active"));
+      function enterAlarmingState() {
+        if (timerModel.state === TIMER_STATES.ALARMING) return;
+        timerModel.state = TIMER_STATES.ALARMING;
+        timerModel.remainingSec = 0;
+        if (timerModel.intervalId) {
+          clearInterval(timerModel.intervalId);
+          timerModel.intervalId = null;
+        }
+        updateTimerDisplay();
+
+        if (btnTimerStartPause) btnTimerStartPause.textContent = "▶ Bắt Đầu";
+        if (timerAlarmBanner) timerAlarmBanner.style.display = "block";
+
+        playSchoolBell();
+        showToast("🔔 ĐÃ HẾT GIỜ LÀM BÀI! Thầy/Cô thông báo học sinh dừng bút nộp bài.", "warning");
+      }
+
+      function timerTick() {
+        if (timerModel.state !== TIMER_STATES.RUNNING) return;
+        const now = Date.now();
+        const diffMs = timerModel.targetEndTime - now;
+        if (diffMs > 0) {
+          timerModel.remainingSec = Math.ceil(diffMs / 1000);
+          updateTimerDisplay();
+        } else {
+          enterAlarmingState();
+        }
+      }
+
+      function startTimerRunning() {
+        timerModel.state = TIMER_STATES.RUNNING;
+        timerModel.targetEndTime = Date.now() + timerModel.remainingSec * 1000;
+        if (btnTimerStartPause) btnTimerStartPause.textContent = "⏸ Tạm Dừng";
+        if (timerAlarmBanner) timerAlarmBanner.style.display = "none";
+        if (timerModel.intervalId) {
+          clearInterval(timerModel.intervalId);
+          timerModel.intervalId = null;
+        }
+        timerModel.intervalId = setInterval(timerTick, 250);
+        updateTimerDisplay();
+      }
+
+      function pauseTimerRunning() {
+        timerModel.state = TIMER_STATES.PAUSED;
+        if (timerModel.intervalId) {
+          clearInterval(timerModel.intervalId);
+          timerModel.intervalId = null;
+        }
+        timerModel.remainingSec = Math.max(0, Math.ceil((timerModel.targetEndTime - Date.now()) / 1000));
+        timerModel.targetEndTime = 0;
+        if (btnTimerStartPause) btnTimerStartPause.textContent = "▶ Tiếp Tục";
+        updateTimerDisplay();
+      }
+
+      function resetTimerModel() {
+        stopSchoolBell();
+        if (timerModel.intervalId) {
+          clearInterval(timerModel.intervalId);
+          timerModel.intervalId = null;
+        }
+        timerModel.state = TIMER_STATES.IDLE;
+        timerModel.remainingSec = timerModel.durationSec;
+        timerModel.targetEndTime = 0;
+        if (btnTimerStartPause) btnTimerStartPause.textContent = "▶ Bắt Đầu";
+        if (timerAlarmBanner) timerAlarmBanner.style.display = "none";
+        updateTimerDisplay();
+      }
+
+      // Preset Chips (Áp dụng Event Delegation tối ưu kiến trúc SPEC)
+      const timerPresetContainer = document.getElementById("timerPresetContainer");
+      if (timerPresetContainer) {
+        timerPresetContainer.addEventListener("click", (e) => {
+          const btn = e.target.closest("[data-timer-set]");
+          if (!btn) return;
+          timerPresetContainer.querySelectorAll("[data-timer-set]").forEach(b => b.classList.remove("active"));
           btn.classList.add("active");
           const secs = parseInt(btn.dataset.timerSet, 10);
-          timerDuration = secs;
-          timerRemaining = secs;
-          if (isTimerRunning) {
-            clearInterval(timerInterval);
-            isTimerRunning = false;
-            if (btnTimerStartPause) btnTimerStartPause.textContent = "▶ Bắt Đầu";
+          stopSchoolBell();
+          if (timerModel.intervalId) {
+            clearInterval(timerModel.intervalId);
+            timerModel.intervalId = null;
           }
+          timerModel.durationSec = secs;
+          timerModel.remainingSec = secs;
+          timerModel.state = TIMER_STATES.IDLE;
+          timerModel.targetEndTime = 0;
+          if (btnTimerStartPause) btnTimerStartPause.textContent = "▶ Bắt Đầu";
+          if (timerAlarmBanner) timerAlarmBanner.style.display = "none";
+          if (customTimerMinutesInput) customTimerMinutesInput.value = Math.floor(secs / 60);
           updateTimerDisplay();
         });
-      });
+      }
 
+      // Start/Pause Button
       if (btnTimerStartPause) {
-        btnTimerStartPause.addEventListener("click", () => {
-          if (!isTimerRunning) {
-            isTimerRunning = true;
-            btnTimerStartPause.textContent = "⏸ Tạm Dừng";
-            timerInterval = setInterval(() => {
-              if (timerRemaining > 0) {
-                timerRemaining--;
-                updateTimerDisplay();
-              } else {
-                clearInterval(timerInterval);
-                isTimerRunning = false;
-                btnTimerStartPause.textContent = "▶ Bắt Đầu";
-                playAlarmChime();
-                alert("🔔 HẾT GIỜ LÀM BÀI! Thầy/Cô thông báo học sinh dừng bút nộp bài.");
-              }
-            }, 1000);
-          } else {
-            clearInterval(timerInterval);
-            isTimerRunning = false;
-            btnTimerStartPause.textContent = "▶ Tiếp Tục";
+        btnTimerStartPause.addEventListener("click", async () => {
+          await ensureAudioContext();
+          if (timerModel.state === TIMER_STATES.IDLE || timerModel.state === TIMER_STATES.PAUSED) {
+            startTimerRunning();
+          } else if (timerModel.state === TIMER_STATES.RUNNING) {
+            pauseTimerRunning();
+          } else if (timerModel.state === TIMER_STATES.ALARMING || timerModel.state === TIMER_STATES.COMPLETED) {
+            stopSchoolBell();
+            timerModel.remainingSec = timerModel.durationSec;
+            startTimerRunning();
           }
         });
       }
 
+      // Reset Button
       if (btnTimerReset) {
         btnTimerReset.addEventListener("click", () => {
-          if (timerInterval) clearInterval(timerInterval);
-          isTimerRunning = false;
-          timerRemaining = timerDuration;
+          resetTimerModel();
+        });
+      }
+
+      // Test Alarm Chime
+      if (btnTestAlarmChime) {
+        btnTestAlarmChime.addEventListener("click", async () => {
+          await ensureAudioContext();
+          playSchoolBell();
+          showToast("🔔 Đang phát thử chuông trường học trên loa...");
+        });
+      }
+
+      // Apply Custom Timer Minutes
+      if (btnApplyCustomTimer && customTimerMinutesInput) {
+        btnApplyCustomTimer.addEventListener("click", async () => {
+          await ensureAudioContext();
+          const raw = Number(customTimerMinutesInput.value);
+          if (!Number.isFinite(raw) || raw < 1) {
+            showToast("Vui lòng nhập số phút từ 1 đến 180!", "warning");
+            return;
+          }
+          const minutes = Math.min(180, Math.max(1, Math.trunc(raw)));
+          customTimerMinutesInput.value = minutes;
+          document.querySelectorAll("[data-timer-set]").forEach(b => b.classList.remove("active"));
+          stopSchoolBell();
+          if (timerModel.intervalId) {
+            clearInterval(timerModel.intervalId);
+            timerModel.intervalId = null;
+          }
+          timerModel.durationSec = minutes * 60;
+          timerModel.remainingSec = timerModel.durationSec;
+          timerModel.state = TIMER_STATES.IDLE;
+          timerModel.targetEndTime = 0;
           if (btnTimerStartPause) btnTimerStartPause.textContent = "▶ Bắt Đầu";
+          if (timerAlarmBanner) timerAlarmBanner.style.display = "none";
+          updateTimerDisplay();
+          showToast(`⏱️ Đã đặt đồng hồ: ${minutes} phút!`);
+        });
+      }
+
+      // Quick Extension Buttons: +1p, +5p, -1p
+      if (btnTimerAdd1) {
+        btnTimerAdd1.addEventListener("click", () => {
+          const addSec = 60;
+          if (timerModel.state === TIMER_STATES.RUNNING) {
+            timerModel.targetEndTime += addSec * 1000;
+            timerModel.remainingSec = Math.min(10800, Math.ceil((timerModel.targetEndTime - Date.now()) / 1000));
+          } else if (timerModel.state === TIMER_STATES.PAUSED || timerModel.state === TIMER_STATES.IDLE) {
+            timerModel.remainingSec = Math.min(10800, timerModel.remainingSec + addSec);
+            timerModel.durationSec = timerModel.remainingSec;
+          } else if (timerModel.state === TIMER_STATES.ALARMING || timerModel.state === TIMER_STATES.COMPLETED) {
+            stopSchoolBell();
+            if (timerAlarmBanner) timerAlarmBanner.style.display = "none";
+            timerModel.remainingSec = addSec;
+            timerModel.durationSec = addSec;
+            timerModel.state = TIMER_STATES.PAUSED;
+            if (btnTimerStartPause) btnTimerStartPause.textContent = "▶ Tiếp Tục";
+          }
           updateTimerDisplay();
         });
       }
+
+      if (btnTimerAdd5) {
+        btnTimerAdd5.addEventListener("click", () => {
+          const addSec = 300;
+          if (timerModel.state === TIMER_STATES.RUNNING) {
+            timerModel.targetEndTime += addSec * 1000;
+            timerModel.remainingSec = Math.min(10800, Math.ceil((timerModel.targetEndTime - Date.now()) / 1000));
+          } else if (timerModel.state === TIMER_STATES.PAUSED || timerModel.state === TIMER_STATES.IDLE) {
+            timerModel.remainingSec = Math.min(10800, timerModel.remainingSec + addSec);
+            timerModel.durationSec = timerModel.remainingSec;
+          } else if (timerModel.state === TIMER_STATES.ALARMING || timerModel.state === TIMER_STATES.COMPLETED) {
+            stopSchoolBell();
+            if (timerAlarmBanner) timerAlarmBanner.style.display = "none";
+            timerModel.remainingSec = addSec;
+            timerModel.durationSec = addSec;
+            timerModel.state = TIMER_STATES.PAUSED;
+            if (btnTimerStartPause) btnTimerStartPause.textContent = "▶ Tiếp Tục";
+          }
+          updateTimerDisplay();
+        });
+      }
+
+      if (btnTimerMinus1) {
+        btnTimerMinus1.addEventListener("click", () => {
+          if (timerModel.remainingSec <= 60) {
+            return showToast("Thời gian tối thiểu là 1 phút!", "info");
+          }
+          if (timerModel.state === TIMER_STATES.RUNNING) {
+            timerModel.targetEndTime = Math.max(Date.now() + 60000, timerModel.targetEndTime - 60000);
+            timerModel.remainingSec = Math.ceil((timerModel.targetEndTime - Date.now()) / 1000);
+          } else if (timerModel.state === TIMER_STATES.PAUSED || timerModel.state === TIMER_STATES.IDLE) {
+            timerModel.remainingSec = Math.max(60, timerModel.remainingSec - 60);
+            timerModel.durationSec = timerModel.remainingSec;
+          }
+          updateTimerDisplay();
+        });
+      }
+
+      // Alarm Banner Actions
+      if (btnStopAlarmAndCollect) {
+        btnStopAlarmAndCollect.addEventListener("click", () => {
+          stopSchoolBell();
+          if (timerModel.intervalId) {
+            clearInterval(timerModel.intervalId);
+            timerModel.intervalId = null;
+          }
+          timerModel.state = TIMER_STATES.COMPLETED;
+          if (timerAlarmBanner) timerAlarmBanner.style.display = "none";
+          showToast("📋 Đã tắt chuông và hoàn thành thu bài!");
+        });
+      }
+
+      if (btnReplayAlarmBell) {
+        btnReplayAlarmBell.addEventListener("click", async () => {
+          await ensureAudioContext();
+          playSchoolBell();
+        });
+      }
+
+      // Chống drift qua sự kiện hệ thống
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden && timerModel.state === TIMER_STATES.RUNNING) timerTick();
+      });
+      window.addEventListener("pageshow", () => {
+        if (timerModel.state === TIMER_STATES.RUNNING) timerTick();
+      });
+      window.addEventListener("focus", () => {
+        if (timerModel.state === TIMER_STATES.RUNNING) timerTick();
+      });
+      window.addEventListener("beforeunload", () => {
+        stopSchoolBell();
+        if (sharedAudioCtx && sharedAudioCtx.state !== "closed") {
+          try {
+            sharedAudioCtx.close();
+          } catch (closeErr) {
+            console.warn("[WebAudio] Lỗi đóng AudioContext khi unload:", closeErr);
+          }
+        }
+      });
 
       // 20.3. XUẤT HÀNG LOẠT THẺ QR HỌC LIỆU A4 (BATCH PRINTABLE QR)
       const batchQrModal = document.getElementById("batchQrModal");

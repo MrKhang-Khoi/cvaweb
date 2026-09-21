@@ -13,5 +13,8 @@
     "vietnam-edu"
   ],
   "author": "Antigravity & CVA Pedagogical Team",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
 }

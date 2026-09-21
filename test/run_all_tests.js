@@ -90,6 +90,7 @@ assert(!htmlContent.includes('onclick="window.teacherPortal'), 'Triệt tiêu to
 assert(!htmlContent.includes('btnAlarmOpenSite.onclick ='), 'Không gán trực tiếp .onclick trên nút mở website báo thức');
 assert(htmlContent.includes('portalContainer.addEventListener("click"'), 'Áp dụng Event Delegation tối ưu trên portalContainer');
 assert(htmlContent.includes('allVaultListContainer.addEventListener("click"'), 'Áp dụng Event Delegation an toàn trên allVaultListContainer');
+assert(htmlContent.includes('timerPresetContainer.addEventListener("click"'), 'Áp dụng Event Delegation tối ưu trên timerPresetContainer');
 
 // 4. KIỂM THỬ ĐỘ TOÀN VẸN CÁC PHẦN TỬ DOM (DOM INTEGRITY)
 console.log('\n📌 4. Kiểm thử Độ toàn vẹn DOM Elements:');
@@ -113,8 +114,8 @@ assert(swContent.includes('ignoreSearch: true'), 'Service Worker hỗ trợ igno
 // 6. KIỂM THỬ TĨNH OXLINT (LINTING)
 console.log('\n📌 6. Kiểm thử Tĩnh Oxlint:');
 try {
-  const oxlintOutput = execSync(`npx oxlint "${swPath}" -D correctness`, { encoding: 'utf8' });
-  assert(true, `Oxlint Service Worker: PASS (0 errors, 0 warnings)`);
+  execSync(`npx oxlint "${swPath}" "${__dirname}" -D correctness`, { encoding: 'utf8' });
+  assert(true, `Oxlint Static Analysis (sw.js & test/): PASS (0 errors, 0 warnings)`);
 } catch(err) {
   assert(false, `Oxlint cảnh báo: ${err.message}`);
 }
