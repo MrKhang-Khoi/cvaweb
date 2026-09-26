@@ -3641,7 +3641,7 @@
         }
       });
 
-      const APP_VERSION = "2.1.0";
+      const APP_VERSION = "2.3.2";
       const SCHEMA_VERSION = 2;
       const isFileProtocol = typeof window !== "undefined" && window.location.protocol === "file:";
 
@@ -6521,7 +6521,7 @@
                 timestamp: Date.now(),
                 stage: errItem.stage,
                 error: errItem.error,
-                ...(errItem.extra || {})
+                ...(errItem.extra)
               }));
             } catch(storageErr) {
               console.warn("[Crash Recovery] Không thể lưu cờ lỗi có fencing vào localStorage:", storageErr);
@@ -7875,10 +7875,21 @@
         }
       }
 
+      function removeControlChars(s) {
+        let res = "";
+        for (let i = 0; i < s.length; i++) {
+          const code = s.charCodeAt(i);
+          if ((code >= 0 && code <= 8) || code === 11 || code === 12 || (code >= 14 && code <= 31) || (code >= 127 && code <= 159)) {
+            continue;
+          }
+          res += s[i];
+        }
+        return res;
+      }
+
       function escapeHtml(str) {
         if (!str) return "";
-        return String(str)
-          .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, "")
+        return removeControlChars(String(str))
           .replace(/&/g, "&amp;")
           .replace(/</g, "&lt;")
           .replace(/>/g, "&gt;")
@@ -11332,7 +11343,7 @@
       function openReminderModal() {
         if (reminderLinkedWeb) {
           /* sanitize */ reminderLinkedWeb.innerHTML = '<option value="">-- Không gắn trang web --</option>' +
-            linksData.map(l => `<option value="${l.id}">🌐 ${escapeHtml(l.title)}</option>`).join("");
+            linksData.map(l => `<option value="${escapeHtml(l.id)}">🌐 ${escapeHtml(l.title)}</option>`).join("");
         }
         if (reminderDate && !reminderDate.value) {
           const defaultDue = new Date();
@@ -11359,18 +11370,30 @@
 
       if (btnRequestNotification) {
         btnRequestNotification.addEventListener("click", () => {
-          if (!("Notification" in window)) return showToast("Trình duyệt không hỗ trợ thông báo", "error");
-          Notification.requestPermission().then(permission => {
+          const handlePermission = (permission) => {
             if (permission === "granted") {
               showToast("🔔 Đã cấp quyền thông báo thành công!");
-              new Notification("Web Giáo Viên", {
-                body: "Hệ thống sẽ gửi thông báo khi đến hạn công việc!",
-                icon: "./icons/icon-192.png"
-              });
+              try {
+                new Notification("Web Giáo Viên", {
+                  body: "Hệ thống sẽ gửi thông báo khi đến hạn công việc!",
+                  icon: "./icons/icon-192.png"
+                });
+              } catch (eNotif) {
+                console.warn("[Notification] Lỗi hiển thị notification thử:", eNotif);
+              }
             } else {
               showToast("Chưa cấp quyền thông báo", "error");
             }
-          });
+          };
+
+          try {
+            const permPromise = Notification.requestPermission(handlePermission);
+            if (permPromise && typeof permPromise.then === "function") {
+              permPromise.then(handlePermission).catch(() => {});
+            }
+          } catch (e) {
+            console.warn("[Notification] Lỗi requestPermission:", e);
+          }
         });
       }
 
@@ -12299,7 +12322,7 @@
         if (!batchQrSelectList) return;
         /* sanitize */ batchQrSelectList.innerHTML = linksData.map(l => `
           <label style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">
-            <input type="checkbox" value="${l.id}" checked style="transform: scale(1.15);">
+            <input type="checkbox" value="${escapeHtml(l.id)}" checked style="transform: scale(1.15);">
             <span>${escapeHtml(l.title)} (${escapeHtml(cleanUrl(l.url))})</span>
           </label>
         `).join("");
@@ -12604,8 +12627,8 @@
        * Tự động kéo từ Cloud Firebase, nếu ngoại tuyến sẽ tự động di cư từ DEFAULT_LINKS
        * Tự động chuyển danh mục về "all" để hiển thị đầy đủ 18 website sư phạm
        */
-      async function performTeacherDataSync(options = { showNotification: true, resetCategory: true }) {
-        const isShowNotif = options && options.showNotification !== false;
+      async function performTeacherDataSync(options = {}) {
+        const isShowNotif = options ? options.showNotification !== false : true;
         const isResetCategory = options ? options.resetCategory !== false : true;
         if (isCloudSyncing) {
           if (isShowNotif) showToast("⏳ Đang đồng bộ dữ liệu, vui lòng chờ trong giây lát...", "info");
@@ -12816,7 +12839,6 @@
       window.validateAndGetUnifiedStore = validateAndGetUnifiedStore;
       window.validateSyncPayload = validateSyncPayload;
       window.syncMemoryFromLatestStorage = syncMemoryFromLatestStorage;
-      window.saveVaultStorageUnlocked = safeVaultStorageUnlocked => safeVaultStorageUnlocked; // safety shim
       window.saveVaultStorageUnlocked = saveVaultStorageUnlocked;
       window.saveVaultStorage = saveVaultStorage;
       window.reconcileProjectionsFromManifest = reconcileProjectionsFromManifest;
@@ -12930,7 +12952,7 @@
             syncMemoryFromLatestStorage();
             if (typeof renderItems === "function") renderItems();
             if (typeof renderCategoryTabs === "function") renderCategoryTabs();
-            if (typeof renderRemindersList === "function") renderRemindersList();
+            if (typeof renderReminderList === "function") renderReminderList();
             if (typeof renderTimetableDay === "function" && typeof currentTimetableDay !== "undefined") {
               renderTimetableDay(currentTimetableDay);
             }
