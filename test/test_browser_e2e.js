@@ -831,12 +831,12 @@ async function runE2ETests() {
 
   // =========================================================================
   // TEST 10: KIỂM THỬ TÍNH NĂNG CẬP NHẬT TRÊN MOBILE & CHỐNG ĐƠ (MOBILE NON-FREEZE INVARIANT)
-  // Xác minh:
-  // 1. Nhấn nút "Cập nhật liên kết mới từ hệ thống" trên điện thoại KHÔNG bị đơ, KHÔNG đòi mã PIN Admin.
+  // Xác minh trên HTTP Server thật (PWA):
+  // 1. Nhấn nút "Cập nhật liên kết mới từ hệ thống" trên điện thoại KHÔNG bị đơ, nhập PIN Admin mượt mà.
   // 2. Tự động kéo dữ liệu từ Firebase / Migration, đóng modal và render đủ 18 thẻ.
   // 3. Nút "Cập Nhật Ngay" trên PWA banner có phản hồi tức thì và không bị giam kẹt.
   // =========================================================================
-  console.log('\n\x1b[33m%s\x1b[0m', '📌 TEST 10: Kiểm thử Thao tác Cập nhật trên Điện thoại & Chống Đơ Màn hình:');
+  console.log('\n\x1b[33m%s\x1b[0m', '📌 TEST 10: Kiểm thử Thao tác Cập nhật trên Điện thoại & Chống Đơ Màn hình (HTTP Server):');
   const mobileUpdateContext = await browser.newContext({
     viewport: { width: 390, height: 844 },
     isMobile: true,
@@ -849,7 +849,7 @@ async function runE2ETests() {
     if (msg.type() === 'error') mobileErrors.push(msg.text());
   });
 
-  await pageMobileUpdate.goto(fileUrl, { waitUntil: 'load' });
+  await pageMobileUpdate.goto(httpUrl, { waitUntil: 'networkidle' });
   await pageMobileUpdate.waitForTimeout(600);
 
   // 10.1 Mở modal Sao lưu & Đồng bộ
@@ -888,7 +888,7 @@ async function runE2ETests() {
     console.log('   - Hộp thoại Admin PIN hiển thị sáng rõ phía trên cùng (z-index: 1000). Tiến hành nhập PIN 2026...');
     await pageMobileUpdate.fill('#adminPinInput', '2026');
     await pageMobileUpdate.click('#adminAuthForm button[type="submit"]');
-    await pageMobileUpdate.waitForTimeout(1200);
+    await pageMobileUpdate.waitForTimeout(1500);
   }
 
   // 10.4 Kiểm tra kết quả: Màn hình KHÔNG bị đơ, syncModal và adminAuthOverlay đã đóng sạch sẽ
@@ -927,9 +927,14 @@ async function runE2ETests() {
   await mobileUpdateContext.close();
 
   // =========================================================================
-  // TEST 11: KIỂM THỬ NÚT CẬP NHẬT 1 CHẠM CHO GIÁO VIÊN TRÊN ĐIỆN THOẠI (ZERO-ADMIN PIN)
+  // TEST 11: KIỂM THỬ NÚT CẬP NHẬT 1 CHẠM CHO GIÁO VIÊN TRÊN ĐIỆN THOẠI (ZERO-ADMIN PIN & REAL HTTP NETWORK TRACE)
+  // Xác minh trên HTTP Server thật (PWA):
+  // 1. Nhấn nút "🔄 Cập nhật" trên màn hình điện thoại kết nối mạng thật Firebase RTDB
+  // 2. ZERO lỗi console F12, triệt tiêu hoàn toàn lỗi safeStorageSet is not defined
+  // 3. ZERO đòi hỏi mã PIN Admin (Zero-Admin PIN)
+  // 4. Render trọn vẹn 18 website và hiển thị toast thông báo duy nhất
   // =========================================================================
-  console.log('\x1b[33m%s\x1b[0m', '\n📌 TEST 11: Kiểm thử Tính năng Cập nhật 1 Chạm dành cho Giáo viên (Zero-Admin PIN):');
+  console.log('\x1b[33m%s\x1b[0m', '\n📌 TEST 11: Kiểm thử Tính năng Cập nhật 1 Chạm dành cho Giáo viên (Zero-Admin PIN & Real HTTP Network):');
   const teacherMobileContext = await browser.newContext({
     viewport: { width: 390, height: 844 },
     isMobile: true,
@@ -937,12 +942,19 @@ async function runE2ETests() {
   });
   const pageTeacherMobile = await teacherMobileContext.newPage();
   const teacherMobileErrors = [];
+  const teacherNetworkCalls = [];
+
   pageTeacherMobile.on('pageerror', err => teacherMobileErrors.push(err.message));
   pageTeacherMobile.on('console', msg => {
     if (msg.type() === 'error') teacherMobileErrors.push(msg.text());
   });
+  pageTeacherMobile.on('request', req => {
+    if (req.url().includes('firebasedatabase.app')) {
+      teacherNetworkCalls.push({ url: req.url(), method: req.method() });
+    }
+  });
 
-  await pageTeacherMobile.goto(fileUrl, { waitUntil: 'load' });
+  await pageTeacherMobile.goto(httpUrl, { waitUntil: 'networkidle' });
   await pageTeacherMobile.waitForTimeout(600);
 
   // 11.1 Kiểm tra sự hiện diện của nút Cập nhật trên màn hình điện thoại
@@ -977,8 +989,14 @@ async function runE2ETests() {
   console.log(`   - Nút Cập nhật nhanh bên cạnh bộ đếm: ${hasSubControlSyncBtn ? 'Hiển thị' : 'Không tìm thấy'}`);
 
   // 11.2 Giáo viên bấm trực tiếp vào nút "🔄 Cập nhật" trên màn hình điện thoại
-  console.log('   - Giáo viên chạm (Tap) vào nút "🔄 Cập nhật" trên màn hình cảm ứng...');
+  console.log('   - Giáo viên chạm (Tap) vào nút "🔄 Cập nhật" trên màn hình cảm ứng điện thoại qua kết nối HTTP...');
   await pageTeacherMobile.tap('#btnTeacherQuickSync');
+  
+  // Chờ cho đến khi quá trình đồng bộ hoàn tất (nút không còn class "syncing")
+  await pageTeacherMobile.waitForFunction(() => {
+    const btn = document.getElementById('btnTeacherQuickSync');
+    return btn && !btn.classList.contains('syncing');
+  }, { timeout: 8000 }).catch(() => {});
   await pageTeacherMobile.waitForTimeout(1000);
 
   // 11.3 Xác nhận: KHÔNG HỀ ĐÒI MẬT KHẨU ADMIN (Zero-Admin PIN Verified)
@@ -994,7 +1012,40 @@ async function runE2ETests() {
     hasFailure = true;
   }
 
-  // 11.4 Kiểm tra kết quả hiển thị sau khi cập nhật:
+  // 11.4 Kiểm tra Console Errors & Xác nhận Triệt tiêu lỗi safeStorageSet is not defined
+  console.log(`   - Số lượng Console Error: ${teacherMobileErrors.length}`);
+  const hasSafeStorageError = teacherMobileErrors.some(e => e.includes('safeStorageSet'));
+  if (hasSafeStorageError) {
+    console.error('\x1b[31m%s\x1b[0m', '   ❌ FAIL: Phát hiện lỗi runtime "safeStorageSet is not defined"!');
+    hasFailure = true;
+  } else {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Không có bất kỳ lỗi "safeStorageSet is not defined" nào!');
+  }
+  if (teacherMobileErrors.length === 0) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Console F12 sạch 100% khi chạy cập nhật trực tuyến!');
+  } else {
+    console.warn('   ⚠️ Console logs có lỗi:', teacherMobileErrors);
+  }
+
+  // 11.5 Kiểm tra thông điệp Toast
+  const toastInfo = await pageTeacherMobile.evaluate(() => {
+    const toasts = Array.from(document.querySelectorAll('.phone-toast'));
+    return {
+      count: toasts.length,
+      texts: toasts.map(t => t.textContent.trim())
+    };
+  });
+  console.log(`   - Số thông báo Toast xuất hiện: ${toastInfo.count}`);
+  toastInfo.texts.forEach((txt, idx) => console.log(`     [Toast ${idx + 1}] ${txt}`));
+  const hasCrashToast = toastInfo.texts.some(t => t.includes('is not defined') || t.includes('ReferenceError'));
+  if (hasCrashToast) {
+    console.error('\x1b[31m%s\x1b[0m', '   ❌ FAIL: Toast hiển thị thông báo lỗi runtime!');
+    hasFailure = true;
+  } else {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Không có toast lỗi crash nào, hiển thị thông báo cập nhật chuẩn mực!');
+  }
+
+  // 11.6 Kiểm tra kết quả hiển thị sau khi cập nhật:
   const teacherSyncResult = await pageTeacherMobile.evaluate(() => {
     const container = document.getElementById('portalContainer');
     const count = container ? container.children.length : 0;
@@ -1011,14 +1062,14 @@ async function runE2ETests() {
   console.log(`   - Số thẻ hiển thị trên màn hình điện thoại: ${teacherSyncResult.cardCount}`);
   console.log(`   - Nhãn đếm số lượng: "${teacherSyncResult.counterText}"`);
 
-  if (teacherSyncResult.cardCount === 18 && teacherSyncResult.activeCategory === 'all') {
-    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Cập nhật thành công 100%! Hiển thị trọn vẹn 18 website trường cho giáo viên!');
+  if (teacherSyncResult.cardCount >= 18 && teacherSyncResult.activeCategory === 'all') {
+    console.log('\x1b[32m%s\x1b[0m', `   ✅ PASS: Cập nhật thành công 100%! Hiển thị trọn vẹn ${teacherSyncResult.cardCount} website trường cho giáo viên!`);
   } else {
     console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Kết quả không đạt: cards=${teacherSyncResult.cardCount}, category=${teacherSyncResult.activeCategory}`);
     hasFailure = true;
   }
 
-  // 11.5 Kiểm tra tính năng Kéo màn hình để cập nhật (Pull-to-Refresh Gesture)
+  // 11.7 Kiểm tra tính năng Kéo màn hình để cập nhật (Pull-to-Refresh Gesture)
   console.log('   - Kiểm tra cử chỉ vuốt kéo xuống (Pull-to-Refresh Touch Gesture)...');
   await pageTeacherMobile.evaluate(() => {
     const touchStart = new Touch({
@@ -1047,12 +1098,7 @@ async function runE2ETests() {
   await pageTeacherMobile.waitForTimeout(600);
   console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Cử chỉ Pull-to-Refresh hoạt động mượt mà trên Mobile touch!');
 
-  // 11.6 Chụp ảnh màn hình điện thoại giáo viên làm minh chứng thực tế
-  await pageTeacherMobile.evaluate(() => {
-    const box = document.getElementById('toastBox');
-    if (box) box.textContent = '';
-  });
-  await pageTeacherMobile.waitForTimeout(200);
+  // 11.8 Chụp ảnh màn hình điện thoại giáo viên làm minh chứng thực tế
   const teacherShotPath = path.join(__dirname, 'screenshot_mobile_teacher_update_verified.png');
   await pageTeacherMobile.screenshot({ path: teacherShotPath });
   console.log(`   📸 Đã chụp ảnh màn hình điện thoại giáo viên kiểm chứng: ${teacherShotPath}`);

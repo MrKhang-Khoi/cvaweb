@@ -4017,6 +4017,16 @@
         return true;
       }
 
+      function safeStorageSet(key, val) {
+        try {
+          localStorage.setItem(key, String(val));
+          return true;
+        } catch(e) {
+          console.warn("[Storage] Không thể ghi " + key + ":", e);
+          return false;
+        }
+      }
+
       function safeStorageRemove(key) {
         localStorage.removeItem(key);
         if (localStorage.getItem(key) !== null) {
@@ -9896,8 +9906,16 @@
       function showToast(msg, type = "info") {
         const box = document.getElementById("toastBox");
         if (!box) return;
+        if (type !== "info" || !msg.startsWith("🔄")) {
+          const prevLoading = box.querySelectorAll(".phone-toast");
+          prevLoading.forEach(el => {
+            if (el.textContent && el.textContent.startsWith("🔄")) {
+              el.remove();
+            }
+          });
+        }
         const t = document.createElement("div");
-        t.className = "phone-toast" + (type === "error" ? " toast-error" : "");
+        t.className = "phone-toast" + (type === "error" ? " toast-error" : (type === "warning" ? " toast-warning" : ""));
         t.textContent = msg;
         box.appendChild(t);
         setTimeout(() => {
@@ -12421,15 +12439,15 @@
        * Kiểm tra và kéo dữ liệu mới nhất từ Cloud về máy client
        * Áp dụng Smart Merge: Cập nhật link hệ thống, bảo toàn 100% link cá nhân và yêu thích
        */
-      async function checkCloudSystemUpdates(isManual = false) {
+      async function checkCloudSystemUpdates(isManual = false, forceCheck = false, silent = false) {
         if (isFileProtocol || (typeof navigator !== "undefined" && !navigator.onLine)) {
-          if (isManual) showToast("⚠️ Chế độ ngoại tuyến, không thể kiểm tra cập nhật đám mây.", "warning");
+          if (isManual && !silent) showToast("⚠️ Chế độ ngoại tuyến, không thể kiểm tra cập nhật đám mây.", "warning");
           return { success: false, error: "Offline" };
         }
         if (isCloudSyncing) return { success: false, error: "SyncInProgress" };
 
         try {
-          if (isManual) showToast("🔄 Đang kiểm tra dữ liệu mới từ máy chủ trường...", "info");
+          if (isManual && !silent) showToast("🔄 Đang kiểm tra dữ liệu mới từ máy chủ trường...", "info");
 
           const verRes = await fetch(`${CLOUD_SYNC_ENDPOINT}/version.json?t=${Date.now()}`, {
             method: "GET",
@@ -12437,18 +12455,18 @@
             cache: "no-store"
           });
           if (!verRes.ok) {
-            if (isManual) showToast("ℹ️ Chưa có bản cập nhật đám mây trên máy chủ.", "info");
+            if (isManual && !silent) showToast("ℹ️ Chưa có bản cập nhật đám mây trên máy chủ.", "info");
             return { success: false, error: "NoCloudData" };
           }
           const cloudVerData = await verRes.json();
           if (!cloudVerData || !cloudVerData.updatedAt) {
-            if (isManual) showToast("ℹ️ Dữ liệu trên máy chủ trường đã ở bản mới nhất.", "info");
+            if (isManual && !silent) showToast("ℹ️ Dữ liệu trên máy chủ trường đã ở bản mới nhất.", "info");
             return { success: true, updated: false };
           }
 
           const localSyncAt = Number(localStorage.getItem("teacher_hub_cloud_synced_at") || 0);
           const needsHealing = Array.isArray(linksData) && linksData.length < 18;
-          if (!isManual && !needsHealing && cloudVerData.updatedAt <= localSyncAt) {
+          if (!isManual && !forceCheck && !needsHealing && cloudVerData.updatedAt <= localSyncAt) {
             return { success: true, updated: false };
           }
 
@@ -12462,7 +12480,7 @@
           }
           const cloudConfig = await configRes.json();
           if (!cloudConfig || !Array.isArray(cloudConfig.links)) {
-            if (isManual) showToast("ℹ️ Dữ liệu đám mây không đúng định dạng.", "warning");
+            if (isManual && !silent) showToast("ℹ️ Dữ liệu đám mây không đúng định dạng.", "warning");
             return { success: false, error: "InvalidCloudPayload" };
           }
 
@@ -12537,15 +12555,17 @@
           renderItems();
           if (typeof syncBottomDock === "function") syncBottomDock();
 
-          if (mergeResult && (mergeResult.addedCount > 0 || mergeResult.updatedCount > 0)) {
-            showToast(`☁️ Đã đồng bộ từ trường: Cập nhật ${mergeResult.updatedCount} và thêm ${mergeResult.addedCount} liên kết mới!`);
-          } else if (isManual) {
-            showToast("✅ Danh sách website đã đồng bộ hoàn toàn với dữ liệu mới nhất của trường!");
+          if (!silent) {
+            if (mergeResult && (mergeResult.addedCount > 0 || mergeResult.updatedCount > 0)) {
+              showToast(`☁️ Đã đồng bộ từ trường: Cập nhật ${mergeResult.updatedCount} và thêm ${mergeResult.addedCount} liên kết mới!`);
+            } else if (isManual) {
+              showToast("✅ Danh sách website đã đồng bộ hoàn toàn với dữ liệu mới nhất của trường!");
+            }
           }
           return mergeResult || { success: true, updated: false };
         } catch(err) {
           console.warn("[CloudSync] Lỗi khi kiểm tra cập nhật đám mây:", err);
-          if (isManual) {
+          if (isManual && !silent) {
             showToast(`⚠️ Không thể tải dữ liệu đám mây: ${err.message}`, "warning");
           }
           return { success: false, error: err.message };
@@ -12593,10 +12613,10 @@
         let changeSummary = { added: 0, updated: 0 };
 
         try {
-          // 1. Thử kéo từ Firebase Cloud nếu online
+          // 1. Thử kéo từ Firebase Cloud nếu online (silent=true để quản lý 1 toast duy nhất)
           if (!isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
             try {
-              const cloudRes = await checkCloudSystemUpdates(true);
+              const cloudRes = await checkCloudSystemUpdates(true, true, true);
               if (cloudRes && cloudRes.success) {
                 syncSuccess = true;
                 changeSummary.added = cloudRes.addedCount || 0;
@@ -12771,6 +12791,7 @@
       window.reconcileProjectionsFromManifest = reconcileProjectionsFromManifest;
       window.computeRawSha256 = computeRawSha256;
       window.computeTxChecksum = computeTxChecksum;
+      window.safeStorageSet = safeStorageSet;
       window.safeStorageRemove = safeStorageRemove;
       window.validateStoredAuthState = validateStoredAuthState;
       window.checkRateLimit = checkRateLimit;
