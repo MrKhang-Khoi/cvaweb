@@ -3201,6 +3201,15 @@
             <span style="font-size: 1.2rem; color: var(--text-mute);">➔</span>
           </button>
 
+          <!-- 3c. Đồng bộ lên Đám Mây toàn trường (Dành cho Admin) -->
+          <button type="button" id="btnCloudSyncAdmin" class="btn-action" style="background: var(--card-bg); border: 1.5px solid var(--card-border); color: var(--text-main); text-align: left; padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+            <div>
+              <div style="font-weight: 800; font-size: 0.92rem; color: #7c3aed;">☁️ Đẩy Dữ Liệu Lên Đám Mây Toàn Trường (Admin)</div>
+              <div style="font-size: 0.78rem; color: var(--text-mute); margin-top: 2px;">Phát hành ngay các thay đổi lên máy chủ để tất cả máy tính khác tự động cập nhật</div>
+            </div>
+            <span style="font-size: 1.2rem; color: #7c3aed;">➔</span>
+          </button>
+
           <!-- 3b. Cập nhật dữ liệu mới từ hệ thống -->
           <button type="button" id="btnSyncSystemDefaults" class="btn-action" style="background: var(--card-bg); border: 1.5px solid var(--card-border); color: var(--text-main); text-align: left; padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
             <div>
@@ -3500,6 +3509,7 @@
 
       const APP_VERSION = "2.1.0";
       const SCHEMA_VERSION = 2;
+      const isFileProtocol = typeof window !== "undefined" && window.location.protocol === "file:";
 
       // ==========================================================================
       // 1. DANH SÁCH CHUẨN MẪU NGÀNH GIÁO DỤC VIỆT NAM (18 WEBSITE SƯ PHẠM CỐT LÕI)
@@ -3575,33 +3585,634 @@
       let vaultLockTimer = null;
       const VAULT_AUTO_LOCK_MS = 15 * 60 * 1000; // Tự khóa sau 15 phút không dùng
 
-      // 2.1. BẢO VỆ CHỐNG VÉT CẠN (BRUTE-FORCE RATE-LIMITING)
-      function checkRateLimit() {
-        const lockUntil = parseInt(localStorage.getItem("teacher_hub_lock_until") || "0", 10);
-        const now = Date.now();
-        if (now < lockUntil) {
-          const remain = Math.ceil((lockUntil - now) / 1000);
-          showToast(`⚠️ Bạn đã nhập sai quá 5 lần. Vui lòng thử lại sau ${remain} giây!`, "error");
+      // 2.1. BẢO VỆ CHỐNG VÉT CẠN & ĐIỀU PHỐI ĐỒNG THỜI (CONCURRENT BRUTE-FORCE RATE-LIMITING & 2PC WAL)
+      function validateAuthStagingPayload(st) {
+        if (!st || typeof st !== "object" || Array.isArray(st)) {
+          return { valid: false, reason: "Auth staging payload must be a non-null object" };
+        }
+        if (typeof st.stage !== "string") {
+          return { valid: false, reason: "Auth staging stage must be a string" };
+        }
+        if (st.stage !== "auth_lockout" && st.stage !== "auth_failure_increment" && st.stage !== "reset_auth_failures") {
+          return { valid: false, reason: "Unknown auth staging stage: " + st.stage };
+        }
+        if (typeof st.isLockout !== "boolean") {
+          return { valid: false, reason: "Auth staging isLockout must be a boolean" };
+        }
+        if (typeof st.fails !== "number" || !Number.isSafeInteger(st.fails)) {
+          return { valid: false, reason: "Auth staging fails must be a safe integer number" };
+        }
+        if (typeof st.lockUntil !== "number" || !Number.isSafeInteger(st.lockUntil)) {
+          return { valid: false, reason: "Auth staging lockUntil must be a safe integer number" };
+        }
+        if (typeof st.generation !== "number" || !Number.isSafeInteger(st.generation) || st.generation <= 0) {
+          return { valid: false, reason: "Auth staging generation must be a positive safe integer number" };
+        }
+        if (typeof st.token !== "string" || st.token.trim().length === 0) {
+          return { valid: false, reason: "Auth staging token must be a non-empty string" };
+        }
+
+        if (st.stage === "auth_lockout") {
+          if (st.isLockout !== true) {
+            return { valid: false, reason: "Stage auth_lockout requires isLockout === true" };
+          }
+          if (st.fails !== MAX_AUTH_FAILS) {
+            return { valid: false, reason: "Stage auth_lockout requires fails === MAX_AUTH_FAILS (" + MAX_AUTH_FAILS + ")" };
+          }
+          if (st.lockUntil <= 0) {
+            return { valid: false, reason: "Stage auth_lockout requires lockUntil > 0" };
+          }
+        } else if (st.stage === "auth_failure_increment") {
+          if (st.isLockout !== false) {
+            return { valid: false, reason: "Stage auth_failure_increment requires isLockout === false" };
+          }
+          if (st.fails <= 0 || st.fails >= MAX_AUTH_FAILS) {
+            return { valid: false, reason: "Stage auth_failure_increment requires 1 <= fails < MAX_AUTH_FAILS" };
+          }
+          if (st.lockUntil !== 0) {
+            return { valid: false, reason: "Stage auth_failure_increment requires lockUntil === 0" };
+          }
+        } else if (st.stage === "reset_auth_failures") {
+          if (st.isLockout !== false) {
+            return { valid: false, reason: "Stage reset_auth_failures requires isLockout === false" };
+          }
+          if (st.fails !== 0) {
+            return { valid: false, reason: "Stage reset_auth_failures requires fails === 0" };
+          }
+          if (st.lockUntil !== 0) {
+            return { valid: false, reason: "Stage reset_auth_failures requires lockUntil === 0" };
+          }
+        }
+
+        return { valid: true, payload: st };
+      }
+
+      function validateStoredAuthState(storage = localStorage) {
+        if (!storage || typeof storage.getItem !== "function") {
+          return { valid: false, reason: "InvalidStorageInterface" };
+        }
+        const rawFails = storage.getItem("teacher_hub_auth_fails");
+        const rawLockUntil = storage.getItem("teacher_hub_lock_until");
+
+        // State 1: Clean (Chưa từng nhập sai hoặc đã reset thành công)
+        if (rawFails === null && rawLockUntil === null) {
+          return { valid: true, state: "clean", fails: 0, lockUntil: 0 };
+        }
+
+        // Bất kỳ chuỗi rỗng nào cũng là biến dạng (Cấm chuỗi rỗng)
+        if (rawFails === "" || rawLockUntil === "") {
+          return { valid: false, reason: "EmptyStringForbidden" };
+        }
+
+        // Khóa lockUntil không được phép tồn tại cô lập mà không có auth_fails
+        if (rawFails === null && rawLockUntil !== null) {
+          return { valid: false, reason: "OrphanLockUntilWithoutFails" };
+        }
+
+        // Kiểm tra cú pháp của rawFails: bắt buộc là chuỗi chỉ gồm chữ số nguyên dương
+        if (typeof rawFails !== "string" || !/^\d+$/.test(rawFails)) {
+          return { valid: false, reason: "FailsNotDigits: " + String(rawFails) };
+        }
+
+        // 0 lần sai TUYỆT ĐỐI KHÔNG ĐƯỢC LƯU DƯỚI DẠNG KHÓA (0 failures bắt buộc xóa khỏi storage)
+        if (rawFails === "0") {
+          return { valid: false, reason: "StoredFailsCannotBeZeroOrNegative: 0" };
+        }
+
+        // Ánh xạ chuỗi chữ số nguyên canonical sang số nguyên chính xác (Triệt tiêu 100% việc ép kiểu ngầm)
+        const FAILS_CANONICAL_MAP = { "1": 1, "2": 2, "3": 3, "4": 4, "5": 5 };
+        const failsNum = FAILS_CANONICAL_MAP[rawFails];
+        if (failsNum === undefined) {
+          return { valid: false, reason: "StoredFailsExceedsMax: " + String(rawFails) };
+        }
+
+        // State 2: Active Increment (1 <= fails < MAX_AUTH_FAILS)
+        if (failsNum < MAX_AUTH_FAILS) {
+          // Khi chưa đủ số lần khóa (fails < 5), teacher_hub_lock_until BẮT BUỘC PHẢI LÀ NULL
+          if (rawLockUntil !== null) {
+            return { valid: false, reason: "LockUntilMustNotExistWhenFailsLessThanMax: " + String(rawLockUntil) };
+          }
+          return { valid: true, state: "increment", fails: failsNum, lockUntil: 0 };
+        }
+
+        // State 3: Lockout (fails === MAX_AUTH_FAILS)
+        // Khi fails = 5, teacher_hub_lock_until BẮT BUỘC PHẢI TỒN TẠI
+        if (rawLockUntil === null) {
+          return { valid: false, reason: "LockUntilMissingWhenFailsIsMax" };
+        }
+
+        // Cú pháp rawLockUntil: bắt buộc là chuỗi chỉ gồm chữ số
+        if (typeof rawLockUntil !== "string" || !/^\d+$/.test(rawLockUntil)) {
+          return { valid: false, reason: "LockUntilNotDigits: " + String(rawLockUntil) };
+        }
+
+        // Thời điểm khóa bắt buộc là mốc thời gian mili-giây hợp lệ (>= 13 chữ số, triệt tiêu hoàn toàn "0", "5000", số âm)
+        if (rawLockUntil.length < 13 || rawLockUntil.length > 15 || rawLockUntil[0] === "0") {
+          return { valid: false, reason: "LockUntilTimestampInvalid: " + String(rawLockUntil) };
+        }
+
+        // Chuyển đổi an toàn không ép kiểu ngầm bằng parseInt với round-trip validation bắt buộc
+        const parsedLock = parseInt(rawLockUntil, 10);
+        if (!Number.isSafeInteger(parsedLock) || String(parsedLock) !== rawLockUntil || parsedLock < 1000000000000) {
+          return { valid: false, reason: "LockUntilTimestampInvalid: " + String(rawLockUntil) };
+        }
+
+        return { valid: true, state: "lockout", fails: failsNum, lockUntil: parsedLock };
+      }
+
+      function checkRateLimitUnlocked(ctx = null) {
+        // 1. Kiểm tra tồn tại của cva_auth_staging: Nếu có, kích hoạt crash recovery dưới lock context
+        let stagingRaw = localStorage.getItem("cva_auth_staging");
+        if (stagingRaw !== null) {
+          try {
+            const parsedSt = JSON.parse(stagingRaw);
+            const valSt = validateAuthStagingPayload(parsedSt);
+            if (!valSt.valid) {
+              console.error("[Auth] cva_auth_staging không hợp lệ trong checkRateLimitUnlocked (Fail-Closed):", valSt.reason);
+              isStorageDegraded = true;
+              return false;
+            }
+          } catch (eParseSt) {
+            console.error("[Auth] cva_auth_staging hỏng JSON trong checkRateLimitUnlocked (Fail-Closed):", eParseSt);
+            isStorageDegraded = true;
+            return false;
+          }
+
+          if (ctx && typeof recoverStagingTransaction === "function") {
+            try {
+              const recRes = recoverStagingTransaction(ctx);
+              if (!recRes || recRes.error) {
+                console.error("[Auth] recoverStagingTransaction thất bại trong checkRateLimitUnlocked:", recRes ? recRes.error : "Unknown");
+                return false;
+              }
+            } catch(recErr) {
+              console.error("[Auth] Lỗi ngoại lệ khi recoverStagingTransaction trong checkRateLimitUnlocked:", recErr);
+              return false;
+            }
+          }
+          // Sau khi thử khôi phục: Nếu cva_auth_staging vẫn tồn tại (chưa được dọn sạch) -> Fail-Closed
+          stagingRaw = localStorage.getItem("cva_auth_staging");
+          if (stagingRaw !== null) {
+            console.warn("[Auth] cva_auth_staging chưa được khôi phục hoặc dọn sạch (Fail-Closed).");
+            return false;
+          }
+        }
+
+        // 2. Kiểm tra cờ lỗi cva_auth_error
+        if (localStorage.getItem("cva_auth_error") !== null) {
+          console.error("[Auth] Phát hiện cờ cva_auth_error (Fail-Closed)!");
           return false;
+        }
+
+        // 2.5 Kiểm tra tính toàn vẹn của teacher_hub_auth_fails và teacher_hub_lock_until (Fail-Closed)
+        const authState = validateStoredAuthState(localStorage);
+        if (!authState.valid) {
+          console.error("[Auth] Trạng thái xác thực lưu trữ bị biến dạng (Fail-Closed):", authState.reason);
+          isStorageDegraded = true;
+          if (typeof showDegradedStorageBanner === "function") {
+            showDegradedStorageBanner("Dữ liệu xác thực bị biến dạng hoặc sai lệch trạng thái. Tạm khóa an toàn (Fail-Closed).");
+          }
+          if (ctx) {
+            try {
+              if (verifyAuthFencing(ctx)) {
+                safeFencedSetAuth("cva_auth_error", JSON.stringify({
+                  errorKey: "cva_auth_error",
+                  stage: "auth_storage_corrupted",
+                  error: "validateStoredAuthState failed: " + authState.reason,
+                  time: Date.now()
+                }), ctx);
+              } else {
+                console.warn("[Auth] Fencing không hợp lệ khi ghi nhận cờ cva_auth_error, bảo toàn WAL.");
+              }
+            } catch (eSet) {
+              console.error("[Auth] Lỗi ghi cva_auth_error có fencing:", eSet);
+            }
+          }
+          return false;
+        }
+
+        // 3. Kiểm tra lockout
+        if (authState.state === "lockout") {
+          const now = Date.now();
+          if (now < authState.lockUntil) {
+            const remain = Math.ceil((authState.lockUntil - now) / 1000);
+            showToast(`⚠️ Bạn đã nhập sai quá 5 lần. Vui lòng thử lại sau ${remain} giây!`, "error");
+            return false;
+          }
+          // Lockout đã hết hạn (expired): Dọn sạch có fencing, cấm nuốt lỗi (Fail-Closed nếu dọn thất bại)
+          if (ctx) {
+            if (!verifyAuthFencing(ctx)) {
+              console.error("[Auth] Fencing context bị revoked hoặc superseded trước khi dọn expired lockout (Fail-Closed)!");
+              throw new Error("FencingViolation: Cannot clean expired lockout with superseded lock context (Fail-Closed)");
+            }
+            safeFencedRemoveAuth("teacher_hub_auth_fails", ctx);
+            safeFencedRemoveAuth("teacher_hub_lock_until", ctx);
+            return true;
+          }
+          return true;
+        }
+
+        return true;
+      }
+
+      function checkRateLimit(lockCtx = null) {
+        const activeLock = lockCtx || (typeof currentLockContext !== "undefined" ? currentLockContext : null);
+        if (activeLock) {
+          return checkRateLimitUnlocked(activeLock);
+        }
+
+        // Khi gọi độc lập (ngoài lock): Kiểm tra tính toàn vẹn của WAL staging và cờ lỗi
+        const stagingRaw = localStorage.getItem("cva_auth_staging");
+        if (stagingRaw !== null) {
+          try {
+            const st = JSON.parse(stagingRaw);
+            const valRes = validateAuthStagingPayload(st);
+            if (!valRes.valid) {
+              throw new Error("StagingSchemaValidationFailed: " + valRes.reason);
+            }
+
+            if (st.stage === "auth_lockout") {
+              if (Date.now() < st.lockUntil) {
+                const remain = Math.ceil((st.lockUntil - Date.now()) / 1000);
+                showToast(`⚠️ Bạn đã nhập sai quá 5 lần. Vui lòng thử lại sau ${remain} giây!`, "error");
+                return false;
+              }
+            } else if (st.stage === "auth_failure_increment") {
+              // Giao dịch ghi tăng số lần sai đang dở dang (In-flight increment) -> Khóa chặn an toàn (Fail-Closed)
+              console.warn("[Auth] Phát hiện giao dịch auth staging đang dở dang chưa commit (Fail-Closed).");
+              showToast("⏳ Hệ thống đang đồng bộ phiên xác thực, vui lòng thử lại sau giây lát!", "warning");
+              return false;
+            } else if (st.stage === "reset_auth_failures") {
+              // Giao dịch reset đang dở dang trong WAL
+            }
+          } catch(eStaging) {
+            console.error("[Auth] cva_auth_staging bị hỏng hoặc không hợp lệ. Kích hoạt Fail-Closed (Read-Only, 0 storage writes)!", eStaging);
+            isStorageDegraded = true;
+            if (typeof showDegradedStorageBanner === "function") {
+              showDegradedStorageBanner("Phát hiện trạng thái xác thực bất thường hoặc bị biến dạng. Kích hoạt Fail-Closed để bảo vệ tài khoản!");
+            }
+            showToast("⛔ Lỗi bảo mật: Dữ liệu xác thực không hợp lệ. Hệ thống tạm khóa (Fail-Closed)!", "error");
+            return false;
+          }
+        }
+
+        if (localStorage.getItem("cva_auth_error") !== null) {
+          return false;
+        }
+
+        // Kiểm tra tính toàn vẹn của dữ liệu đích qua validateStoredAuthState
+        const authState = validateStoredAuthState(localStorage);
+        if (!authState.valid) {
+          console.error("[Auth] teacher_hub_auth_fails / lock_until bị biến dạng trong checkRateLimit (Fail-Closed):", authState.reason);
+          isStorageDegraded = true;
+          if (typeof showDegradedStorageBanner === "function") {
+            showDegradedStorageBanner("Dữ liệu số lần thử xác thực bị biến dạng. Tạm khóa an toàn (Fail-Closed).");
+          }
+          return false;
+        }
+
+        if (authState.state === "lockout") {
+          const now = Date.now();
+          if (now < authState.lockUntil) {
+            const remain = Math.ceil((authState.lockUntil - now) / 1000);
+            showToast(`⚠️ Bạn đã nhập sai quá 5 lần. Vui lòng thử lại sau ${remain} giây!`, "error");
+            return false;
+          }
+        }
+
+        return true;
+      }
+
+      function safeStorageRemove(key) {
+        localStorage.removeItem(key);
+        if (localStorage.getItem(key) !== null) {
+          throw new Error("ReadAfterDeleteFailure on " + key);
         }
         return true;
       }
 
-      function recordAuthFailure() {
-        const fails = parseInt(localStorage.getItem("teacher_hub_auth_fails") || "0", 10) + 1;
-        localStorage.setItem("teacher_hub_auth_fails", fails.toString());
-        if (fails >= MAX_AUTH_FAILS) {
-          const lockUntil = Date.now() + LOCKOUT_MS;
-          localStorage.setItem("teacher_hub_lock_until", lockUntil.toString());
-          showToast(`⛔ Đã nhập sai ${fails} lần. Tạm khóa 30 giây để bảo vệ!`, "error");
-        } else {
-          showToast(`❌ Sai mật khẩu! Còn ${MAX_AUTH_FAILS - fails} lần thử.`, "error");
+      function verifyAuthFencing(ctx) {
+        if (!ctx || ctx.revoked) return false;
+        if (!ctx.token || typeof ctx.token !== "string" || !ctx.generation) return false;
+        const expectedGen = Number(ctx.generation);
+        if (!Number.isSafeInteger(expectedGen) || expectedGen <= 0) return false;
+        if (typeof ctx.verifyFencing === "function" && !ctx.verifyFencing()) return false;
+
+        const curGenRaw = localStorage.getItem("cva_fencing_generation");
+        const curTok = localStorage.getItem("cva_fencing_token");
+        const curLockRaw = localStorage.getItem("cva_migration_lock");
+
+        if (curGenRaw === null || curTok === null || curLockRaw === null) return false;
+
+        const curGen = Number(curGenRaw);
+        if (!Number.isSafeInteger(curGen) || curGen !== expectedGen || curTok !== ctx.token) {
+          return false;
+        }
+
+        let parsedLock;
+        try {
+          parsedLock = JSON.parse(curLockRaw);
+        } catch {
+          return false;
+        }
+
+        if (
+          !parsedLock ||
+          typeof parsedLock !== "object" ||
+          Array.isArray(parsedLock) ||
+          parsedLock.token !== ctx.token ||
+          typeof parsedLock.generation !== "number" ||
+          !Number.isSafeInteger(parsedLock.generation) ||
+          parsedLock.generation !== expectedGen
+        ) {
+          return false;
+        }
+
+        return true;
+      }
+
+      function safeFencedSetAuth(key, val, ctx) {
+        if (!verifyAuthFencing(ctx)) {
+          throw new Error(`FencingViolation: lock revoked or superseded before writing auth key ${key}`);
+        }
+        localStorage.setItem(key, String(val));
+        if (!verifyAuthFencing(ctx)) {
+          throw new Error(`FencingViolation: lock revoked or superseded after writing auth key ${key}`);
+        }
+        if (localStorage.getItem(key) !== String(val)) {
+          throw new Error(`ReadAfterWriteFailure on auth key ${key}`);
         }
       }
 
-      function resetAuthFailures() {
-        localStorage.removeItem("teacher_hub_auth_fails");
-        localStorage.removeItem("teacher_hub_lock_until");
+      function safeFencedRemoveAuth(key, ctx) {
+        if (!verifyAuthFencing(ctx)) {
+          throw new Error(`FencingViolation: lock revoked or superseded before removing auth key ${key}`);
+        }
+        safeStorageRemove(key);
+        if (!verifyAuthFencing(ctx)) {
+          throw new Error(`FencingViolation: lock revoked or superseded after removing auth key ${key}`);
+        }
+        if (localStorage.getItem(key) !== null) {
+          throw new Error(`ReadAfterDeleteFailure on auth key ${key}`);
+        }
+      }
+
+      async function recordAuthFailure(lockCtx = null) {
+        const runRecord = (ctx) => {
+          if (!ctx || ctx.revoked) {
+            console.error("[Auth] Từ chối recordAuthFailure: Lock context bị thiếu hoặc đã bị revoked (Fail-Closed)!");
+            throw new Error("StorageLockUnavailable: Cannot record auth failure with missing or revoked lock context");
+          }
+          if (!verifyAuthFencing(ctx)) {
+            console.error("[Auth] Từ chối recordAuthFailure: Fencing context bị superseded (Fail-Closed)!");
+            throw new Error("FencingViolation: Cannot record auth failure with superseded lock context");
+          }
+
+          const preAuthSnapshot = {
+            fails: localStorage.getItem("teacher_hub_auth_fails"),
+            lockUntil: localStorage.getItem("teacher_hub_lock_until"),
+            generation: localStorage.getItem("teacher_hub_auth_generation"),
+            token: localStorage.getItem("teacher_hub_auth_token"),
+            staging: localStorage.getItem("cva_auth_staging")
+          };
+
+          const rollbackAuthSnapshot = () => {
+            if (!verifyAuthFencing(ctx)) {
+              console.warn("[Auth] Fencing lost during recordAuthFailure failure; preserving cva_auth_staging and aborting rollback.");
+              isStorageDegraded = true;
+              throw new Error("AuthRollbackFailed: Fencing lost during recordAuthFailure rollback (Fail-Closed)");
+            }
+            try {
+              if (preAuthSnapshot.fails !== null) safeFencedSetAuth("teacher_hub_auth_fails", preAuthSnapshot.fails, ctx);
+              else safeFencedRemoveAuth("teacher_hub_auth_fails", ctx);
+
+              if (preAuthSnapshot.lockUntil !== null) safeFencedSetAuth("teacher_hub_lock_until", preAuthSnapshot.lockUntil, ctx);
+              else safeFencedRemoveAuth("teacher_hub_lock_until", ctx);
+
+              if (preAuthSnapshot.generation !== null) safeFencedSetAuth("teacher_hub_auth_generation", preAuthSnapshot.generation, ctx);
+              else safeFencedRemoveAuth("teacher_hub_auth_generation", ctx);
+
+              if (preAuthSnapshot.token !== null) safeFencedSetAuth("teacher_hub_auth_token", preAuthSnapshot.token, ctx);
+              else safeFencedRemoveAuth("teacher_hub_auth_token", ctx);
+
+              if (preAuthSnapshot.staging !== null) safeFencedSetAuth("cva_auth_staging", preAuthSnapshot.staging, ctx);
+              else safeFencedRemoveAuth("cva_auth_staging", ctx);
+            } catch (rbErr) {
+              console.error("[Auth] Rollback auth snapshot thất bại:", rbErr);
+              isStorageDegraded = true;
+              try {
+                if (verifyAuthFencing(ctx)) {
+                  safeFencedSetAuth("cva_auth_error", JSON.stringify({
+                    errorKey: "cva_auth_error",
+                    stage: "auth_rollback_failed",
+                    error: rbErr ? rbErr.message : "Rollback failed",
+                    time: Date.now()
+                  }), ctx);
+                }
+              } catch (eFlag) {
+                console.error("[Auth] Không thể ghi cờ cva_auth_error sau rollback thất bại:", eFlag);
+              }
+              throw new Error("AuthRollbackFailed: " + (rbErr ? rbErr.message : "Rollback failed"));
+            }
+          };
+
+          const authState = validateStoredAuthState(localStorage);
+          if (!authState.valid) {
+            console.error("[Auth] teacher_hub_auth_fails / lock_until bị biến dạng hoặc ngoài miền (Fail-Closed):", authState.reason);
+            isStorageDegraded = true;
+            if (typeof showDegradedStorageBanner === "function") {
+              showDegradedStorageBanner("Dữ liệu số lần thử xác thực bị biến dạng. Hệ thống tạm khóa (Fail-Closed).");
+            }
+            const errPayload = JSON.stringify({
+              errorKey: "cva_auth_error",
+              stage: "auth_failures_corrupted",
+              error: "validateStoredAuthState corrupted: " + authState.reason,
+              time: Date.now()
+            });
+            try {
+              if (verifyAuthFencing(ctx)) {
+                safeFencedSetAuth("cva_auth_error", errPayload, ctx);
+              }
+            } catch (eSet) {
+              console.error("[Auth] Không thể ghi cva_auth_error có fencing:", eSet);
+            }
+            throw new Error("AuthFailuresCorrupted: Fail-Closed (" + authState.reason + ")");
+          }
+
+          let currentFails = authState.fails;
+          if (authState.state === "lockout") {
+            console.error("[Auth] recordAuthFailure bị từ chối khi đang trong thời gian lockout (Fail-Closed)");
+            return false;
+          }
+
+          const fails = Math.min(currentFails + 1, MAX_AUTH_FAILS);
+          const isLockout = fails >= MAX_AUTH_FAILS;
+          const lockUntil = isLockout ? (Date.now() + LOCKOUT_MS) : 0;
+
+          try {
+            // 1. Ghi WAL Staging cho lần thử xác thực thất bại
+            const stagingPayload = JSON.stringify({
+              stage: isLockout ? "auth_lockout" : "auth_failure_increment",
+              fails,
+              isLockout,
+              lockUntil,
+              generation: Number(ctx.generation),
+              token: ctx.token,
+              time: Date.now()
+            });
+            safeFencedSetAuth("cva_auth_staging", stagingPayload, ctx);
+
+            // 2. Ghi số lần nhập sai vào storage
+            safeFencedSetAuth("teacher_hub_auth_fails", String(fails), ctx);
+
+            // 3. Nếu vượt ngưỡng: Ghi thời hạn lockout
+            if (isLockout) {
+              safeFencedSetAuth("teacher_hub_lock_until", String(lockUntil), ctx);
+              showToast(`⛔ Đã nhập sai ${fails} lần. Tạm khóa 30 giây để bảo vệ!`, "error");
+            } else {
+              showToast(`❌ Sai mật khẩu! Còn ${MAX_AUTH_FAILS - fails} lần thử.`, "error");
+            }
+
+            // 4. Ghi commit metadata
+            safeFencedSetAuth("teacher_hub_auth_generation", String(ctx.generation), ctx);
+            safeFencedSetAuth("teacher_hub_auth_token", ctx.token, ctx);
+
+            // 5. Dọn WAL staging sau khi commit thành công
+            safeFencedRemoveAuth("cva_auth_staging", ctx);
+
+            return { fails, isLockout, lockUntil };
+          } catch (err) {
+            rollbackAuthSnapshot();
+            throw err;
+          }
+        };
+
+        const activeLock = lockCtx || (typeof currentLockContext !== "undefined" ? currentLockContext : null);
+        if (activeLock) {
+          return runRecord(activeLock);
+        }
+        if (typeof executeWithCrossTabLock === "function") {
+          return await executeWithCrossTabLock(async (lock) => {
+            return runRecord(lock);
+          });
+        }
+
+        // FAIL-CLOSED: Không có Web Locks API và không có active lock context hợp lệ
+        console.error("[Auth] Từ chối recordAuthFailure: Thiếu Web Locks API và lock context. Chuyển sang Read-Only (Fail-Closed)!");
+        isStorageDegraded = true;
+        if (typeof showDegradedStorageBanner === "function") {
+          showDegradedStorageBanner("Trình duyệt không hỗ trợ Web Locks API độc quyền. Chuyển sang Chế độ Chỉ Đọc (Fail-Closed).");
+        }
+        throw new Error("StorageLockUnavailable: Thao tác xác thực bắt buộc phải thực thi trong Web Locks API độc quyền (Fail-Closed).");
+      }
+
+      async function resetAuthFailures(lockCtx = null) {
+        const runReset = (ctx) => {
+          if (!ctx || ctx.revoked) {
+            console.error("[Auth] Từ chối resetAuthFailures: Lock context bị thiếu hoặc đã bị revoked (Fail-Closed)!");
+            throw new Error("StorageLockUnavailable: Cannot reset auth failures with missing or revoked lock context");
+          }
+          if (!verifyAuthFencing(ctx)) {
+            console.error("[Auth] Từ chối resetAuthFailures: Fencing context bị superseded (Fail-Closed)!");
+            throw new Error("FencingViolation: Cannot reset auth failures with superseded lock context");
+          }
+
+          const preResetSnapshot = {
+            fails: localStorage.getItem("teacher_hub_auth_fails"),
+            lockUntil: localStorage.getItem("teacher_hub_lock_until"),
+            generation: localStorage.getItem("teacher_hub_auth_generation"),
+            token: localStorage.getItem("teacher_hub_auth_token"),
+            staging: localStorage.getItem("cva_auth_staging")
+          };
+
+          const rollbackResetSnapshot = () => {
+            if (!verifyAuthFencing(ctx)) {
+              console.warn("[Auth] Fencing lost during resetAuthFailures failure; preserving cva_auth_staging and aborting rollback.");
+              isStorageDegraded = true;
+              throw new Error("AuthRollbackFailed: Fencing lost during resetAuthFailures rollback (Fail-Closed)");
+            }
+            try {
+              if (preResetSnapshot.fails !== null) safeFencedSetAuth("teacher_hub_auth_fails", preResetSnapshot.fails, ctx);
+              else safeFencedRemoveAuth("teacher_hub_auth_fails", ctx);
+
+              if (preResetSnapshot.lockUntil !== null) safeFencedSetAuth("teacher_hub_lock_until", preResetSnapshot.lockUntil, ctx);
+              else safeFencedRemoveAuth("teacher_hub_lock_until", ctx);
+
+              if (preResetSnapshot.generation !== null) safeFencedSetAuth("teacher_hub_auth_generation", preResetSnapshot.generation, ctx);
+              else safeFencedRemoveAuth("teacher_hub_auth_generation", ctx);
+
+              if (preResetSnapshot.token !== null) safeFencedSetAuth("teacher_hub_auth_token", preResetSnapshot.token, ctx);
+              else safeFencedRemoveAuth("teacher_hub_auth_token", ctx);
+
+              if (preResetSnapshot.staging !== null) safeFencedSetAuth("cva_auth_staging", preResetSnapshot.staging, ctx);
+              else safeFencedRemoveAuth("cva_auth_staging", ctx);
+            } catch (rbErr) {
+              console.error("[Auth] Rollback reset snapshot thất bại:", rbErr);
+              isStorageDegraded = true;
+              try {
+                if (verifyAuthFencing(ctx)) {
+                  safeFencedSetAuth("cva_auth_error", JSON.stringify({
+                    errorKey: "cva_auth_error",
+                    stage: "auth_reset_rollback_failed",
+                    error: rbErr ? rbErr.message : "Rollback failed",
+                    time: Date.now()
+                  }), ctx);
+                }
+              } catch (eFlag) {
+                console.error("[Auth] Không thể ghi cờ cva_auth_error sau rollback reset thất bại:", eFlag);
+              }
+              throw new Error("AuthRollbackFailed: " + (rbErr ? rbErr.message : "Rollback failed"));
+            }
+          };
+
+          try {
+            // 1. Ghi WAL Staging cho thao tác đặt lại
+            const stagingPayload = JSON.stringify({
+              stage: "reset_auth_failures",
+              fails: 0,
+              isLockout: false,
+              lockUntil: 0,
+              generation: Number(ctx.generation),
+              token: ctx.token,
+              time: Date.now()
+            });
+            safeFencedSetAuth("cva_auth_staging", stagingPayload, ctx);
+
+            // 2. Xóa các khóa đích bằng safeFencedRemoveAuth (fenced verification trước và sau mỗi lần xóa)
+            safeFencedRemoveAuth("teacher_hub_auth_fails", ctx);
+            safeFencedRemoveAuth("teacher_hub_lock_until", ctx);
+
+            // 3. Ghi nhận generation và token commit cho auth
+            safeFencedSetAuth("teacher_hub_auth_generation", String(ctx.generation), ctx);
+            safeFencedSetAuth("teacher_hub_auth_token", ctx.token, ctx);
+
+            // 4. Dọn WAL staging sau khi commit thành công
+            safeFencedRemoveAuth("cva_auth_staging", ctx);
+
+            return true;
+          } catch (err) {
+            rollbackResetSnapshot();
+            throw err;
+          }
+        };
+
+        const activeLock = lockCtx || (typeof currentLockContext !== "undefined" ? currentLockContext : null);
+        if (activeLock) {
+          return runReset(activeLock);
+        }
+        if (typeof executeWithCrossTabLock === "function") {
+          return await executeWithCrossTabLock(async (lock) => {
+            return runReset(lock);
+          });
+        }
+
+        // FAIL-CLOSED: Không có Web Locks API và không có active lock context hợp lệ
+        console.error("[Auth] Từ chối resetAuthFailures: Thiếu Web Locks API và lock context. Chuyển sang Read-Only (Fail-Closed)!");
+        isStorageDegraded = true;
+        if (typeof showDegradedStorageBanner === "function") {
+          showDegradedStorageBanner("Trình duyệt không hỗ trợ Web Locks API độc quyền. Chuyển sang Chế độ Chỉ Đọc (Fail-Closed).");
+        }
+        throw new Error("StorageLockUnavailable: Thao tác xác thực bắt buộc phải thực thi trong Web Locks API độc quyền (Fail-Closed).");
       }
 
       // 2.2. HÀM BĂM MẬT MÃ SHA-256 CHUẨN NIST
@@ -3748,21 +4359,40 @@
       }
 
       // 2.4. QUẢN LÝ MẬT KHẨU ADMIN (ZERO HARDCODED BACKDOOR)
-      async function verifyAdminPin(enteredPin) {
-        if (!checkRateLimit()) return false;
-        const salt = localStorage.getItem("teacher_hub_admin_salt");
-        const storedHash = localStorage.getItem("teacher_hub_admin_hash");
-        if (!salt || !storedHash) {
-          showToast("⚠️ Chưa thiết lập Mật khẩu Admin! Vui lòng bấm vào biểu tượng Khóa Admin để tạo mật khẩu bảo vệ trước khi ghi đè dữ liệu.", "error");
+      async function verifyAdminPin(enteredPin, lockCtx = null) {
+        const runVerify = async (ctx) => {
+          if (!checkRateLimitUnlocked(ctx)) return false;
+          const salt = localStorage.getItem("teacher_hub_admin_salt");
+          const storedHash = localStorage.getItem("teacher_hub_admin_hash");
+          if (!salt || !storedHash) {
+            showToast("⚠️ Chưa thiết lập Mật khẩu Admin! Vui lòng bấm vào biểu tượng Khóa Admin để tạo mật khẩu bảo vệ trước khi ghi đè dữ liệu.", "error");
+            return false;
+          }
+          const enteredHash = await hashPassword(enteredPin, salt);
+          if (enteredHash === storedHash) {
+            await resetAuthFailures(ctx);
+            return true;
+          }
+          await recordAuthFailure(ctx);
           return false;
+        };
+
+        const activeLock = lockCtx || (typeof currentLockContext !== "undefined" ? currentLockContext : null);
+        if (activeLock) {
+          return await runVerify(activeLock);
         }
-        const enteredHash = await hashPassword(enteredPin, salt);
-        if (enteredHash === storedHash) {
-          resetAuthFailures();
-          return true;
+        if (typeof executeWithCrossTabLock === "function") {
+          return await executeWithCrossTabLock(async (lock) => {
+            return await runVerify(lock);
+          });
         }
-        recordAuthFailure();
-        return false;
+
+        console.error("[Auth] Từ chối verifyAdminPin: Thiếu Web Locks API và lock context (Fail-Closed)!");
+        isStorageDegraded = true;
+        if (typeof showDegradedStorageBanner === "function") {
+          showDegradedStorageBanner("Trình duyệt không hỗ trợ Web Locks API độc quyền. Chuyển sang Chế độ Chỉ Đọc (Fail-Closed).");
+        }
+        throw new Error("StorageLockUnavailable: Thao tác xác thực bắt buộc phải thực thi trong Web Locks API độc quyền (Fail-Closed).");
       }
 
       async function initAdminPin(initialPin) {
@@ -3779,8 +4409,8 @@
       }
 
       // ==========================================================================
-      // 3. STORAGE & CATEGORIES (NẠP VÀ ĐỒNG BỘ DỮ LIỆU)
-      // ==========================================================================
+      let isSyncTransactionActive = false;
+
       function updateUnifiedStoreUnlocked(lockCtx = null) {
         const activeLockCtx = lockCtx || (typeof currentLockContext !== "undefined" ? currentLockContext : null);
         if (!activeLockCtx || !activeLockCtx.token || !activeLockCtx.generation || activeLockCtx.revoked) {
@@ -3791,7 +4421,7 @@
         const verifyFencing = () => {
           if (activeLockCtx.revoked) return false;
           if (typeof activeLockCtx.verifyFencing === "function") {
-            return activeLockCtx.verifyFencing();
+            if (!activeLockCtx.verifyFencing()) return false;
           }
           const curGen = Number(localStorage.getItem("cva_fencing_generation") || 0);
           const curTok = localStorage.getItem("cva_fencing_token");
@@ -3812,6 +4442,11 @@
           throw new Error(errMsg);
         }
 
+        if (typeof isSyncTransactionActive !== "undefined" && isSyncTransactionActive) {
+          console.log("[Storage] updateUnifiedStoreUnlocked: Sync transaction đang diễn ra, từ chối ghi đè re-entrant.");
+          return false;
+        }
+
         const safeFencedSet = (key, val) => {
           if (!verifyFencing()) throw new Error(`FencingViolation: active fencing lost before writing ${key}`);
           localStorage.setItem(key, val);
@@ -3821,7 +4456,7 @@
 
         const safeFencedRemove = (key) => {
           if (!verifyFencing()) throw new Error(`FencingViolation: active fencing lost before removing ${key}`);
-          localStorage.removeItem(key);
+          safeStorageRemove(key);
           if (!verifyFencing()) throw new Error(`FencingViolation: active fencing lost after removing ${key}`);
           if (localStorage.getItem(key) !== null) throw new Error(`ReadAfterDeleteFailure on ${key}`);
         };
@@ -4015,6 +4650,121 @@
        * Lưu ý: Đây là mã kiểm tra toàn vẹn trạng thái lưu trữ (Storage Consistency Checksum), không dùng khóa bí mật.
        * Hỗ trợ chuẩn Unicode UTF-8 toàn diện (tiếng Việt, emoji, ký tự đặc biệt).
        */
+      function computeRawSha256(str) {
+        function rightRotate(value, amount) {
+          return (value >>> amount) | (value << (32 - amount));
+        }
+
+        const H_INIT = [
+          0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+          0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+        ];
+        const K_CONSTS = [
+          0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+          0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+          0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+          0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+          0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+          0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+          0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+          0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+        ];
+        const hash = H_INIT.slice();
+
+        let bytes;
+        if (typeof TextEncoder !== "undefined") {
+          bytes = new TextEncoder().encode(str);
+        } else if (typeof Buffer !== "undefined") {
+          bytes = Buffer.from(str, "utf8");
+        } else {
+          const utf8 = [];
+          for (let ci = 0; ci < str.length; ci++) {
+            let charcode = str.charCodeAt(ci);
+            if (charcode < 0x80) utf8.push(charcode);
+            else if (charcode < 0x800) {
+              utf8.push(0xc0 | (charcode >> 6), 0x80 | (charcode & 0x3f));
+            } else if (charcode < 0xd800 || charcode >= 0xe000) {
+              utf8.push(0xe0 | (charcode >> 12), 0x80 | ((charcode >> 6) & 0x3f), 0x80 | (charcode & 0x3f));
+            } else {
+              ci++;
+              charcode = 0x10000 + (((charcode & 0x3ff) << 10) | (str.charCodeAt(ci) & 0x3ff));
+              utf8.push(0xf0 | (charcode >> 18), 0x80 | ((charcode >> 12) & 0x3f), 0x80 | ((charcode >> 6) & 0x3f), 0x80 | (charcode & 0x3f));
+            }
+          }
+          bytes = new Uint8Array(utf8);
+        }
+
+        const byteLength = bytes.length;
+        const bitLength = byteLength * 8;
+        const extra = (byteLength % 64 < 56) ? (56 - (byteLength % 64)) : (56 + 64 - (byteLength % 64));
+        const totalLength = byteLength + extra + 8;
+        const padded = new Uint8Array(totalLength);
+        padded.set(bytes, 0);
+        padded[byteLength] = 0x80;
+        const view = new DataView(padded.buffer);
+        view.setUint32(totalLength - 8, Math.floor(bitLength / 0x100000000), false);
+        view.setUint32(totalLength - 4, bitLength >>> 0, false);
+
+        const words = new Uint32Array(totalLength / 4);
+        for (let wi = 0; wi < words.length; wi++) {
+          words[wi] = view.getUint32(wi * 4, false);
+        }
+
+        for (let j = 0; j < words.length; j += 16) {
+          const w = new Uint32Array(64);
+          for (let wi = 0; wi < 16; wi++) {
+            w[wi] = words[j + wi];
+          }
+          for (let wi = 16; wi < 64; wi++) {
+            const s0 = (rightRotate(w[wi - 15], 7) ^ rightRotate(w[wi - 15], 18) ^ (w[wi - 15] >>> 3)) >>> 0;
+            const s1 = (rightRotate(w[wi - 2], 17) ^ rightRotate(w[wi - 2], 19) ^ (w[wi - 2] >>> 10)) >>> 0;
+            w[wi] = (w[wi - 16] + s0 + w[wi - 7] + s1) >>> 0;
+          }
+
+          let a = hash[0];
+          let b = hash[1];
+          let c = hash[2];
+          let d = hash[3];
+          let e = hash[4];
+          let f = hash[5];
+          let g = hash[6];
+          let h = hash[7];
+
+          for (let wi = 0; wi < 64; wi++) {
+            const S1 = (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25)) >>> 0;
+            const ch = ((e & f) ^ ((~e) & g)) >>> 0;
+            const temp1 = (h + S1 + ch + K_CONSTS[wi] + w[wi]) >>> 0;
+            const S0 = (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22)) >>> 0;
+            const maj = ((a & b) ^ (a & c) ^ (b & c)) >>> 0;
+            const temp2 = (S0 + maj) >>> 0;
+
+            h = g;
+            g = f;
+            f = e;
+            e = (d + temp1) >>> 0;
+            d = c;
+            c = b;
+            b = a;
+            a = (temp1 + temp2) >>> 0;
+          }
+
+          hash[0] = (hash[0] + a) >>> 0;
+          hash[1] = (hash[1] + b) >>> 0;
+          hash[2] = (hash[2] + c) >>> 0;
+          hash[3] = (hash[3] + d) >>> 0;
+          hash[4] = (hash[4] + e) >>> 0;
+          hash[5] = (hash[5] + f) >>> 0;
+          hash[6] = (hash[6] + g) >>> 0;
+          hash[7] = (hash[7] + h) >>> 0;
+        }
+
+        let hex = "";
+        for (let hi = 0; hi < 8; hi++) {
+          hex += hash[hi].toString(16).padStart(8, "0");
+        }
+        return hex;
+      }
+
       function computeTxChecksum(categories, links, version, reminders = null, timetable = null) {
         try {
           function canonicalize(obj) {
@@ -4035,115 +4785,7 @@
           const canonTT = canonicalize(timetable && typeof timetable === "object" ? timetable : {});
           const str = `${version || ""}:${Array.isArray(categories) ? categories.length : 0}:${Array.isArray(links) ? links.length : 0}:${JSON.stringify(canonCats)}:${JSON.stringify(canonLinks)}:${JSON.stringify(canonRems)}:${JSON.stringify(canonTT)}`;
 
-          let bytes;
-          if (typeof TextEncoder !== "undefined") {
-            bytes = new TextEncoder().encode(str);
-          } else if (typeof Buffer !== "undefined") {
-            bytes = Buffer.from(str, "utf8");
-          } else {
-            const utf8 = [];
-            for (let ci = 0; ci < str.length; ci++) {
-              let charcode = str.charCodeAt(ci);
-              if (charcode < 0x80) utf8.push(charcode);
-              else if (charcode < 0x800) {
-                utf8.push(0xc0 | (charcode >> 6), 0x80 | (charcode & 0x3f));
-              } else if (charcode < 0xd800 || charcode >= 0xe000) {
-                utf8.push(0xe0 | (charcode >> 12), 0x80 | ((charcode >> 6) & 0x3f), 0x80 | (charcode & 0x3f));
-              } else {
-                ci++;
-                charcode = 0x10000 + (((charcode & 0x3ff) << 10) | (str.charCodeAt(ci) & 0x3ff));
-                utf8.push(0xf0 | (charcode >> 18), 0x80 | ((charcode >> 12) & 0x3f), 0x80 | ((charcode >> 6) & 0x3f), 0x80 | (charcode & 0x3f));
-              }
-            }
-            bytes = new Uint8Array(utf8);
-          }
-
-          function rightRotate(value, amount) {
-            return (value >>> amount) | (value << (32 - amount));
-          }
-          const mathPow = Math.pow;
-          const maxWord = mathPow(2, 32);
-          const hash = [];
-          const k = [];
-          let primeCounter = 0;
-          const isComposite = {};
-          for (let candidate = 2; primeCounter < 64; candidate++) {
-            if (!isComposite[candidate]) {
-              for (let ci = 0; ci < 312; ci += candidate) isComposite[ci] = candidate;
-              hash[primeCounter] = (mathPow(candidate, 0.5) * maxWord) | 0;
-              k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
-            }
-          }
-
-          const byteLength = bytes.length;
-          const bitLength = byteLength * 8;
-          const extra = (byteLength % 64 < 56) ? (56 - (byteLength % 64)) : (56 + 64 - (byteLength % 64));
-          const totalLength = byteLength + extra + 8;
-          const padded = new Uint8Array(totalLength);
-          padded.set(bytes, 0);
-          padded[byteLength] = 0x80;
-          const view = new DataView(padded.buffer);
-          view.setUint32(totalLength - 8, Math.floor(bitLength / maxWord), false);
-          view.setUint32(totalLength - 4, bitLength >>> 0, false);
-
-          const words = new Uint32Array(totalLength / 4);
-          for (let wi = 0; wi < words.length; wi++) {
-            words[wi] = view.getUint32(wi * 4, false);
-          }
-
-          for (let j = 0; j < words.length; j += 16) {
-            const w = new Uint32Array(64);
-            for (let wi = 0; wi < 16; wi++) {
-              w[wi] = words[j + wi];
-            }
-            for (let wi = 16; wi < 64; wi++) {
-              const s0 = (rightRotate(w[wi - 15], 7) ^ rightRotate(w[wi - 15], 18) ^ (w[wi - 15] >>> 3)) >>> 0;
-              const s1 = (rightRotate(w[wi - 2], 17) ^ rightRotate(w[wi - 2], 19) ^ (w[wi - 2] >>> 10)) >>> 0;
-              w[wi] = (w[wi - 16] + s0 + w[wi - 7] + s1) >>> 0;
-            }
-
-            let a = hash[0];
-            let b = hash[1];
-            let c = hash[2];
-            let d = hash[3];
-            let e = hash[4];
-            let f = hash[5];
-            let g = hash[6];
-            let h = hash[7];
-
-            for (let wi = 0; wi < 64; wi++) {
-              const S1 = (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25)) >>> 0;
-              const ch = ((e & f) ^ ((~e) & g)) >>> 0;
-              const temp1 = (h + S1 + ch + k[wi] + w[wi]) >>> 0;
-              const S0 = (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22)) >>> 0;
-              const maj = ((a & b) ^ (a & c) ^ (b & c)) >>> 0;
-              const temp2 = (S0 + maj) >>> 0;
-
-              h = g;
-              g = f;
-              f = e;
-              e = (d + temp1) >>> 0;
-              d = c;
-              c = b;
-              b = a;
-              a = (temp1 + temp2) >>> 0;
-            }
-
-            hash[0] = (hash[0] + a) >>> 0;
-            hash[1] = (hash[1] + b) >>> 0;
-            hash[2] = (hash[2] + c) >>> 0;
-            hash[3] = (hash[3] + d) >>> 0;
-            hash[4] = (hash[4] + e) >>> 0;
-            hash[5] = (hash[5] + f) >>> 0;
-            hash[6] = (hash[6] + g) >>> 0;
-            hash[7] = (hash[7] + h) >>> 0;
-          }
-
-          let hex = "";
-          for (let hi = 0; hi < 8; hi++) {
-            hex += hash[hi].toString(16).padStart(8, "0");
-          }
-          return hex;
+          return computeRawSha256(str);
         } catch(e) {
           console.error("[Storage] Lỗi tính toán checksum SHA-256:", e);
           throw new Error("ChecksumCalculationFailure: " + e.message);
@@ -4206,7 +4848,7 @@
           if (!verifyLock()) {
             throw new Error(`FencingViolation: writer generation ${myGeneration} superseded or lock lost`);
           }
-          localStorage.removeItem(key);
+          safeStorageRemove(key);
           if (!verifyLock()) {
             throw new Error(`FencingViolation: writer generation ${myGeneration} superseded after remove on ${key}`);
           }
@@ -4247,6 +4889,7 @@
 
         try {
           let addedCount = 0;
+          let updatedCount = 0;
           const candidateLinks = JSON.parse(JSON.stringify(linksData));
           const candidateCategories = JSON.parse(JSON.stringify(categoriesData));
 
@@ -4254,17 +4897,46 @@
           const currentCatIds = new Set(candidateCategories.map(c => c && c.id).filter(Boolean));
 
           DEFAULT_LINKS.forEach(defLink => {
-            if (defLink && defLink.id && !currentLinkIds.has(defLink.id)) {
-              candidateLinks.push({ ...defLink });
-              currentLinkIds.add(defLink.id);
-              addedCount++;
+            if (defLink && defLink.id) {
+              const existingIdx = candidateLinks.findIndex(l => l && l.id === defLink.id);
+              if (existingIdx === -1) {
+                candidateLinks.push({ ...defLink });
+                currentLinkIds.add(defLink.id);
+                addedCount++;
+              } else if (force) {
+                const existing = candidateLinks[existingIdx];
+                const hasChanged = existing.url !== defLink.url ||
+                                   existing.title !== defLink.title ||
+                                   existing.category !== defLink.category ||
+                                   existing.color !== defLink.color ||
+                                   existing.iconChar !== defLink.iconChar;
+                if (hasChanged) {
+                  candidateLinks[existingIdx] = {
+                    ...existing,
+                    url: defLink.url,
+                    title: defLink.title,
+                    category: defLink.category,
+                    color: defLink.color,
+                    iconChar: defLink.iconChar
+                  };
+                  updatedCount++;
+                }
+              }
             }
           });
 
           DEFAULT_CATEGORIES.forEach(defCat => {
-            if (defCat && defCat.id && !currentCatIds.has(defCat.id)) {
-              candidateCategories.push({ ...defCat });
-              currentCatIds.add(defCat.id);
+            if (defCat && defCat.id) {
+              const existingCatIdx = candidateCategories.findIndex(c => c && c.id === defCat.id);
+              if (existingCatIdx === -1) {
+                candidateCategories.push({ ...defCat });
+                currentCatIds.add(defCat.id);
+              } else if (force) {
+                if (candidateCategories[existingCatIdx].label !== defCat.label || candidateCategories[existingCatIdx].icon !== defCat.icon) {
+                  candidateCategories[existingCatIdx].label = defCat.label;
+                  candidateCategories[existingCatIdx].icon = defCat.icon;
+                }
+              }
             }
           });
 
@@ -4356,8 +5028,8 @@
           linksData = candidateLinks;
           categoriesData = candidateCategories;
 
-          console.log(`[Storage] Atomic migration thành công (phiên bản ${CURRENT_DATA_VERSION}). Bổ sung ${addedCount} website mới.`);
-          return { success: true, addedCount, skipped: false };
+          console.log(`[Storage] Atomic migration thành công (phiên bản ${CURRENT_DATA_VERSION}). Bổ sung ${addedCount} website mới, cập nhật ${updatedCount} website.`);
+          return { success: true, addedCount, updatedCount, skipped: false };
         } catch(err) {
           console.error("[Storage] Atomic migration thất bại, kiểm tra quyền fencing trước khi rollback:", err);
 
@@ -4510,7 +5182,7 @@
           if (!verifyLock()) {
             throw new Error(`FencingViolation: writer generation ${myGeneration} superseded or lock lost`);
           }
-          localStorage.removeItem(key);
+          safeStorageRemove(key);
           if (!verifyLock()) {
             throw new Error(`FencingViolation: writer generation ${myGeneration} superseded after remove on ${key}`);
           }
@@ -4757,7 +5429,7 @@
             typeof l.id === "string" && l.id.trim() !== "" && 
             typeof l.title === "string" && l.title.trim() !== "" && 
             typeof l.url === "string" && /^https?:\/\//i.test(l.url.trim()) &&
-            typeof l.category === "string" && l.category.trim() !== ""
+            (!l.category || (typeof l.category === "string" && l.category.length <= 64))
           );
           if (!validLinks) {
             console.warn("[Storage] Liên kết trong teacher_hub_store_v2 chứa URL/cấu trúc không hợp lệ hoặc giao thức nguy hiểm");
@@ -4950,11 +5622,80 @@
         const MIGRATION_STAGING_KEY = "cva_migration_staging";
         const FENCING_GEN_KEY = "cva_fencing_generation";
 
+        const validateAuthStagingLocal = (typeof validateAuthStagingPayload === "function")
+          ? validateAuthStagingPayload
+          : function(st) {
+              if (!st || typeof st !== "object" || Array.isArray(st)) {
+                return { valid: false, reason: "Auth staging payload must be a non-null object" };
+              }
+              if (typeof st.stage !== "string") {
+                return { valid: false, reason: "Auth staging stage must be a string" };
+              }
+              if (st.stage !== "auth_lockout" && st.stage !== "auth_failure_increment" && st.stage !== "reset_auth_failures") {
+                return { valid: false, reason: "Unknown auth staging stage: " + st.stage };
+              }
+              if (typeof st.isLockout !== "boolean") {
+                return { valid: false, reason: "Auth staging isLockout must be a boolean" };
+              }
+              if (typeof st.fails !== "number" || !Number.isSafeInteger(st.fails)) {
+                return { valid: false, reason: "Auth staging fails must be a safe integer number" };
+              }
+              if (typeof st.lockUntil !== "number" || !Number.isSafeInteger(st.lockUntil)) {
+                return { valid: false, reason: "Auth staging lockUntil must be a safe integer number" };
+              }
+              if (typeof st.generation !== "number" || !Number.isSafeInteger(st.generation) || st.generation <= 0) {
+                return { valid: false, reason: "Auth staging generation must be a positive safe integer number" };
+              }
+              if (typeof st.token !== "string" || st.token.trim().length === 0) {
+                return { valid: false, reason: "Auth staging token must be a non-empty string" };
+              }
+
+              if (st.stage === "auth_lockout") {
+                if (st.isLockout !== true) {
+                  return { valid: false, reason: "Stage auth_lockout requires isLockout === true" };
+                }
+                if (st.fails !== MAX_AUTH_FAILS) {
+                  return { valid: false, reason: "Stage auth_lockout requires fails === MAX_AUTH_FAILS (" + MAX_AUTH_FAILS + ")" };
+                }
+                if (st.lockUntil <= 0) {
+                  return { valid: false, reason: "Stage auth_lockout requires lockUntil > 0" };
+                }
+              } else if (st.stage === "auth_failure_increment") {
+                if (st.isLockout !== false) {
+                  return { valid: false, reason: "Stage auth_failure_increment requires isLockout === false" };
+                }
+                if (st.fails <= 0 || st.fails >= MAX_AUTH_FAILS) {
+                  return { valid: false, reason: "Stage auth_failure_increment requires 1 <= fails < MAX_AUTH_FAILS" };
+                }
+                if (st.lockUntil !== 0) {
+                  return { valid: false, reason: "Stage auth_failure_increment requires lockUntil === 0" };
+                }
+              } else if (st.stage === "reset_auth_failures") {
+                if (st.isLockout !== false) {
+                  return { valid: false, reason: "Stage reset_auth_failures requires isLockout === false" };
+                }
+                if (st.fails !== 0) {
+                  return { valid: false, reason: "Stage reset_auth_failures requires fails === 0" };
+                }
+                if (st.lockUntil !== 0) {
+                  return { valid: false, reason: "Stage reset_auth_failures requires lockUntil === 0" };
+                }
+              }
+
+              return { valid: true, payload: st };
+            };
+
         const initialStaging = localStorage.getItem(MIGRATION_STAGING_KEY);
         const initialSyncStaging = localStorage.getItem("cva_sync_staging");
         const initialVaultStaging = localStorage.getItem("cva_vault_staging");
         const initialStoreStaging = localStorage.getItem("cva_store_staging");
-        if (!initialStaging && !initialSyncStaging && !initialVaultStaging && !initialStoreStaging) return { recovered: false, clean: true };
+        const initialAuthStaging = localStorage.getItem("cva_auth_staging");
+        const fencingCorrupt = localStorage.getItem("cva_fencing_corrupt");
+        if (fencingCorrupt) {
+          console.error("[Crash Recovery] cva_fencing_corrupt phát hiện! Fencing marker ở trạng thái không nhất quán. Kích hoạt Fail-Closed!");
+          return { recovered: false, error: "FencingCorrupt: markers corrupted during acquisition rollback (Fail-Closed)" };
+        }
+        if (!initialStaging && !initialSyncStaging && !initialVaultStaging && !initialStoreStaging && !initialAuthStaging) return { recovered: false, clean: true };
 
         // Snapshot toàn bộ storage state hiện tại vào RAM ở đầu Phase 1 (Pure Read Snapshot Invariant)
         const initialStoreRaw = localStorage.getItem("teacher_hub_store_v2");
@@ -5008,17 +5749,19 @@
           if (typeof activeLockCtx.verifyFencing === "function") {
             return activeLockCtx.verifyFencing();
           }
-          const curGen = Number(localStorage.getItem(FENCING_GEN_KEY) || 0);
+          const curGenRaw = localStorage.getItem(FENCING_GEN_KEY);
           const curTok = localStorage.getItem("cva_fencing_token");
           const curLock = localStorage.getItem(MIGRATION_LOCK_KEY);
-          if (!curLock) return false;
+          if (!curLock || curGenRaw === null || curTok === null) return false;
+          const curGen = Number(curGenRaw);
+          if (!Number.isSafeInteger(curGen) || curGen !== myRecoveryGen || curTok !== myRecoveryToken) return false;
           try {
             const p = JSON.parse(curLock);
-            if (!p || typeof p !== "object" || p.token !== myRecoveryToken || Number(p.generation) !== myRecoveryGen) return false;
+            if (!p || typeof p !== "object" || Array.isArray(p) || p.token !== myRecoveryToken || typeof p.generation !== "number" || !Number.isSafeInteger(p.generation) || p.generation !== myRecoveryGen) return false;
           } catch {
             return false;
           }
-          return curGen === myRecoveryGen && curTok === myRecoveryToken;
+          return true;
         }
 
         function safeSetAndVerify(key, val) {
@@ -5072,7 +5815,7 @@
           if (!p || typeof p !== "object" || p.token !== myRecoveryToken || Number(p.generation) !== myRecoveryGen) {
             throw new Error(`FencingViolation: recovery lock ownership mismatch on ${key}`);
           }
-          localStorage.removeItem(key);
+          safeStorageRemove(key);
           // Post-remove Double-Check Lock Invariant to eliminate TOCTOU race
           const postGen = Number(localStorage.getItem(FENCING_GEN_KEY) || 0);
           const postLock = localStorage.getItem(MIGRATION_LOCK_KEY);
@@ -5107,6 +5850,7 @@
         let preValStore = null;
         let preValSync = null;
         let preValMigration = null;
+        let preValAuth = null;
         const validationErrors = [];
 
         // 1.1 Pre-validate Vault Staging in RAM
@@ -5511,6 +6255,98 @@
           }
         }
 
+        // 1.5 Pre-validate Auth Staging in RAM
+        if (initialAuthStaging) {
+          try {
+            preValAuth = JSON.parse(initialAuthStaging);
+          } catch(parseAuthErr) {
+            console.error("[Crash Recovery] cva_auth_staging JSON lỗi cú pháp:", parseAuthErr);
+            validationErrors.push({
+              errorKey: "cva_auth_error",
+              stage: "auth_crash_recovery_corrupted_json",
+              error: "cva_auth_staging corrupted JSON (Fail-Closed)",
+              extra: { rawStaging: typeof initialAuthStaging === "string" ? initialAuthStaging.substring(0, 200) : null }
+            });
+          }
+          if (preValAuth && typeof preValAuth !== "object") {
+            console.error("[Crash Recovery] cva_auth_staging không phải object (Fail-Closed)");
+            validationErrors.push({
+              errorKey: "cva_auth_error",
+              stage: "auth_crash_recovery_not_object",
+              error: "cva_auth_staging payload not an object (Fail-Closed)"
+            });
+          } else if (preValAuth) {
+            const valRes = (typeof validateAuthStagingPayload === "function")
+              ? validateAuthStagingPayload(preValAuth)
+              : validateAuthStagingLocal(preValAuth);
+
+            if (!valRes.valid) {
+              console.error("[Crash Recovery] cva_auth_staging không hợp lệ (Fail-Closed):", valRes.reason);
+              validationErrors.push({
+                errorKey: "cva_auth_error",
+                stage: "auth_crash_recovery_schema_inconsistent",
+                error: "Auth staging schema inconsistency (Fail-Closed): " + valRes.reason,
+                extra: { staging: preValAuth, reason: valRes.reason }
+              });
+            } else {
+              const authStage = preValAuth.stage;
+              const authGen = preValAuth.generation;
+              const authToken = preValAuth.token.trim();
+
+              if (authGen > myRecoveryGen) {
+                console.error("[Crash Recovery] Auth staging generation in future (" + authGen + " > " + myRecoveryGen + ")! Kích hoạt Fail-Closed.");
+                validationErrors.push({
+                  errorKey: "cva_auth_error",
+                  stage: "auth_crash_recovery_future_generation",
+                  error: "Auth staging generation in the future: " + authGen + " > " + myRecoveryGen + " (Fail-Closed)",
+                  extra: { authGen, myRecoveryGen }
+                });
+              } else if (authGen < myRecoveryGen && authToken !== myRecoveryToken) {
+                // Staging thuộc thế hệ cũ và token khác context recovery hiện tại:
+                const initialAuthGen = Number(localStorage.getItem("teacher_hub_auth_generation") || 0);
+                const initialAuthToken = localStorage.getItem("teacher_hub_auth_token") || "";
+                const hasNewerAuthCommit = Boolean(
+                  initialAuthGen > authGen ||
+                  (initialAuthGen === authGen && initialAuthToken !== authToken)
+                );
+
+                if (!hasNewerAuthCommit) {
+                  console.error("[Crash Recovery] Auth staging superseded without proven commit (Fail-Closed):", { authGen, myRecoveryGen, authToken, initialAuthGen });
+                  validationErrors.push({
+                    errorKey: "cva_auth_error",
+                    stage: "auth_crash_recovery_unverified_superseded_staging",
+                    error: "Auth staging superseded without proven commit (Fail-Closed)",
+                    extra: { authGen, myRecoveryGen, authToken, initialAuthGen }
+                  });
+                } else {
+                  console.log("[Crash Recovery] Auth staging thế hệ cũ đã được chứng minh superseded bởi transaction mới hơn.");
+                  preValAuth._supersededAndCommitted = true;
+                }
+              } else if (authToken !== myRecoveryToken) {
+                console.error("[Crash Recovery] Auth staging token mismatch với recovery context token (Fail-Closed):", { authToken, myRecoveryToken });
+                validationErrors.push({
+                  errorKey: "cva_auth_error",
+                  stage: "auth_crash_recovery_token_mismatch",
+                  error: "Auth staging token does not match recovery lock context token (Fail-Closed)",
+                  extra: { authGen, authToken, myRecoveryToken }
+                });
+              }
+            }
+
+            // Thẩm định tính toàn vẹn của auth state đích hiện tại trong storage qua validateStoredAuthState (Fail-Closed nếu corrupted)
+            const storedAuth = (typeof validateStoredAuthState === "function")
+              ? validateStoredAuthState(localStorage)
+              : null;
+            if (storedAuth && !storedAuth.valid) {
+              validationErrors.push({
+                errorKey: "cva_auth_error",
+                stage: "auth_crash_recovery_corrupted_stored_auth",
+                error: "Stored auth state corrupted (Fail-Closed): " + storedAuth.reason
+              });
+            }
+          }
+        }
+
         // KẾT THÚC PHASE 1: Thẩm định toàn diện thuần RAM (0 storage writes trong suốt Phase 1).
         // Nếu có bất kỳ lỗi nào, chỉ sau khi Phase 1 kết thúc mới ghi nhận cờ lỗi qua safeSetAndVerify
         // dưới Web Locks context, rồi dừng ngay lập tức (Fail-Closed toàn cục) mà TUYỆT ĐỐI KHÔNG thực hiện Phase 2.
@@ -5537,6 +6373,112 @@
         // Giai đoạn 2 tiêu thụ trực tiếp các đối tượng in-memory (preValVault, preValStore,
         // preValSync, preValMigration) mà KHÔNG cần đọc lại hay phân tích cú pháp từ localStorage.
         // ═══════════════════════════════════════════════════════════════
+        const prePhase2Snapshot = {
+          // Data & Projections
+          store: localStorage.getItem("teacher_hub_store_v2"),
+          version: localStorage.getItem("teacher_hub_data_version"),
+          categories: localStorage.getItem("teacher_hub_categories_v1"),
+          links: localStorage.getItem("teacher_hub_links_v2"),
+          reminders: localStorage.getItem("teacher_hub_reminders_v1"),
+          timetable: localStorage.getItem("teacher_hub_timetable_v1"),
+          // Vault keys
+          vaultEnvelope: localStorage.getItem("teacher_hub_vault_envelope_v1"),
+          vaultSalt: localStorage.getItem("teacher_hub_vault_salt"),
+          vaultCiphertext: localStorage.getItem("teacher_hub_vault_enc_v2"),
+          legacyVault: localStorage.getItem("teacher_hub_vault_v1"),
+          // Staging keys
+          migrationStaging: localStorage.getItem(MIGRATION_STAGING_KEY),
+          syncStaging: localStorage.getItem("cva_sync_staging"),
+          vaultStaging: localStorage.getItem("cva_vault_staging"),
+          storeStaging: localStorage.getItem("cva_store_staging"),
+          authStaging: localStorage.getItem("cva_auth_staging"),
+          // Auth keys
+          authFails: localStorage.getItem("teacher_hub_auth_fails"),
+          authLockUntil: localStorage.getItem("teacher_hub_lock_until"),
+          authGen: localStorage.getItem("teacher_hub_auth_generation"),
+          authToken: localStorage.getItem("teacher_hub_auth_token"),
+          // Fencing markers
+          fencingGeneration: localStorage.getItem(FENCING_GEN_KEY),
+          fencingToken: localStorage.getItem("cva_fencing_token"),
+          migrationLock: localStorage.getItem(MIGRATION_LOCK_KEY),
+          // Error flags
+          migrationError: localStorage.getItem("cva_migration_error"),
+          syncError: localStorage.getItem("cva_sync_error"),
+          vaultError: localStorage.getItem("cva_vault_error"),
+          storeError: localStorage.getItem("cva_store_error"),
+          authError: localStorage.getItem("cva_auth_error"),
+          fencingCorrupt: localStorage.getItem("cva_fencing_corrupt"),
+          recoveryRollbackError: localStorage.getItem("cva_recovery_rollback_error")
+        };
+
+        function rollbackAllToPrePhase2() {
+          const keysMap = [
+            ["teacher_hub_store_v2", prePhase2Snapshot.store],
+            ["teacher_hub_data_version", prePhase2Snapshot.version],
+            ["teacher_hub_categories_v1", prePhase2Snapshot.categories],
+            ["teacher_hub_links_v2", prePhase2Snapshot.links],
+            ["teacher_hub_reminders_v1", prePhase2Snapshot.reminders],
+            ["teacher_hub_timetable_v1", prePhase2Snapshot.timetable],
+            ["teacher_hub_vault_envelope_v1", prePhase2Snapshot.vaultEnvelope],
+            ["teacher_hub_vault_salt", prePhase2Snapshot.vaultSalt],
+            ["teacher_hub_vault_enc_v2", prePhase2Snapshot.vaultCiphertext],
+            ["teacher_hub_vault_v1", prePhase2Snapshot.legacyVault],
+            ["teacher_hub_auth_fails", prePhase2Snapshot.authFails],
+            ["teacher_hub_lock_until", prePhase2Snapshot.authLockUntil],
+            ["teacher_hub_auth_generation", prePhase2Snapshot.authGen],
+            ["teacher_hub_auth_token", prePhase2Snapshot.authToken],
+            [MIGRATION_STAGING_KEY, prePhase2Snapshot.migrationStaging],
+            ["cva_sync_staging", prePhase2Snapshot.syncStaging],
+            ["cva_vault_staging", prePhase2Snapshot.vaultStaging],
+            ["cva_store_staging", prePhase2Snapshot.storeStaging],
+            ["cva_auth_staging", prePhase2Snapshot.authStaging],
+            ["cva_migration_error", prePhase2Snapshot.migrationError],
+            ["cva_sync_error", prePhase2Snapshot.syncError],
+            ["cva_vault_error", prePhase2Snapshot.vaultError],
+            ["cva_store_error", prePhase2Snapshot.storeError],
+            ["cva_auth_error", prePhase2Snapshot.authError],
+            ["cva_fencing_corrupt", prePhase2Snapshot.fencingCorrupt],
+            ["cva_recovery_rollback_error", prePhase2Snapshot.recoveryRollbackError]
+          ];
+          let rollbackFailed = false;
+          let rollbackError = null;
+          for (const [key, val] of keysMap) {
+            try {
+              if (!verifyRecoveryLock()) {
+                throw new Error("FencingViolation: recovery lock superseded before rollback on " + key);
+              }
+              if (val !== null && val !== undefined) {
+                safeSetAndVerify(key, val);
+              } else {
+                safeRemoveAndVerify(key);
+              }
+              if (!verifyRecoveryLock()) {
+                throw new Error("FencingViolation: recovery lock superseded after rollback on " + key);
+              }
+            } catch(e) {
+              console.error("[Crash Recovery] Rollback key error on " + key, e);
+              rollbackFailed = true;
+              rollbackError = e;
+              break; // Fail-Closed: Dừng ngay lập tức, CẤM tiếp tục ghi đè các key tiếp theo!
+            }
+          }
+          if (rollbackFailed) {
+            console.error("[Crash Recovery] rollbackAllToPrePhase2 gặp lỗi khi phục hồi snapshot! Đánh dấu cờ lỗi cva_recovery_rollback_error.");
+            try {
+              if (verifyRecoveryLock()) {
+                safeSetAndVerify("cva_recovery_rollback_error", JSON.stringify({
+                  timestamp: Date.now(),
+                  stage: "phase2_rollback_partial_failed",
+                  error: rollbackError ? rollbackError.message : "Unknown rollback error"
+                }));
+              }
+            } catch (flagErr) {
+              console.warn("[Crash Recovery] Không thể lưu cờ cva_recovery_rollback_error:", flagErr);
+            }
+            throw new Error("Phase2RollbackFailed: Không thể rollback hoàn toàn dữ liệu về pre-phase 2 snapshot (Fail-Closed). " + (rollbackError ? rollbackError.message : ""));
+          }
+        }
+
         try {
           // 2.1 Khôi phục giao dịch Vault dở dang nếu có (cva_vault_staging)
           let vaultRecovered = false;
@@ -5563,6 +6505,9 @@
                 } else {
                   safeRemoveAndVerify("teacher_hub_vault_enc_v2");
                 }
+                if (vRec.previous && vRec.previous.legacyPlaintext !== null && vRec.previous.legacyPlaintext !== undefined) {
+                  safeSetAndVerify("teacher_hub_vault_v1", vRec.previous.legacyPlaintext);
+                }
                 vaultRecovered = true;
               } else if (vRec.status === "committed") {
                 // Roll-forward với safeSetAndVerify
@@ -5572,17 +6517,10 @@
                 vaultRecovered = true;
               }
             } catch (vErr) {
-              console.warn("[Crash Recovery] Lỗi khôi phục cva_vault_staging (Fail-Closed, bảo lưu staging):", vErr);
-              try {
-                safeSetAndVerify("cva_vault_error", JSON.stringify({
-                  timestamp: Date.now(),
-                  stage: "vault_crash_recovery_failure",
-                  error: String(vErr && vErr.message ? vErr.message : vErr)
-                }));
-              } catch(eFlag) {
-                console.warn("[Crash Recovery] Không thể lưu cờ cva_vault_error:", eFlag);
-              }
-              return { recovered: false, error: "cva_vault_staging recovery failure (Fail-Closed)" };
+              console.warn("[Crash Recovery] Lỗi khôi phục cva_vault_staging, chuyển tiếp tới Phase 2 coordinator:", vErr);
+              vErr.errorKey = "cva_vault_error";
+              vErr.stage = "vault_crash_recovery_failure";
+              throw vErr;
             }
           }
 
@@ -5684,17 +6622,10 @@
                 }
               }
             } catch (storeErr) {
-              console.error("[Crash Recovery] Lỗi xử lý cva_store_staging (Fail-Closed, bảo lưu staging):", storeErr);
-              try {
-                safeSetAndVerify("cva_store_error", JSON.stringify({
-                  timestamp: Date.now(),
-                  stage: "store_crash_recovery_general_error",
-                  error: storeErr.message
-                }));
-              } catch(sErr) {
-                console.error("[Crash Recovery] Không thể ghi cva_store_error:", sErr);
-              }
-              return { recovered: false, error: "cva_store_staging recovery failure (Fail-Closed)" };
+              console.error("[Crash Recovery] Lỗi xử lý cva_store_staging, chuyển tiếp tới Phase 2 coordinator:", storeErr);
+              storeErr.errorKey = "cva_store_error";
+              storeErr.stage = "store_crash_recovery_general_error";
+              throw storeErr;
             }
           }
 
@@ -5804,17 +6735,10 @@
                 }
               }
             } catch (syncErr) {
-              console.error("[Crash Recovery] Lỗi xử lý cva_sync_staging (Fail-Closed, bảo lưu staging):", syncErr);
-              try {
-                safeSetAndVerify("cva_sync_error", JSON.stringify({
-                  timestamp: Date.now(),
-                  stage: "sync_crash_recovery_general_error",
-                  error: syncErr.message
-                }));
-              } catch (storageErr) {
-                console.error("[Crash Recovery] Không thể ghi cva_sync_error:", storageErr);
-              }
-              return { recovered: false, error: "cva_sync_staging recovery failure (Fail-Closed)" };
+              console.error("[Crash Recovery] Lỗi xử lý cva_sync_staging, chuyển tiếp tới Phase 2 coordinator:", syncErr);
+              syncErr.errorKey = "cva_sync_error";
+              syncErr.stage = "sync_crash_recovery_general_error";
+              throw syncErr;
             }
           }
 
@@ -5887,18 +6811,10 @@
                       migrationResult = { recovered: true, action: "already_committed", version: curStoreParsed.version };
                     } else {
                       console.error(`[Crash Recovery] Xung đột CAS: Unified store có gen ${curStoreGen} > stagingGen ${stagingGen} với version ${curStoreParsed.version}. CẤM GHI ĐÈ để bảo vệ dữ liệu!`);
-                      try {
-                        safeSetAndVerify("cva_migration_error", JSON.stringify({
-                          timestamp: Date.now(),
-                          stage: "crash_recovery_store_cas_conflict",
-                          error: "CAS mismatch: teacher_hub_store_v2 superseded by subsequent transaction",
-                          curStoreGen,
-                          stagingGen,
-                          curStoreVersion: curStoreParsed.version,
-                          candidateVer
-                        }));
-                      } catch(e) { console.warn(e); }
-                      return { recovered: false, error: "CAS mismatch: teacher_hub_store_v2 superseded by subsequent transaction (Fail-Closed, manual recovery required)" };
+                      const err = new Error("CAS mismatch: teacher_hub_store_v2 superseded by subsequent transaction (Fail-Closed, manual recovery required)");
+                      err.errorKey = "cva_migration_error";
+                      err.stage = "crash_recovery_store_cas_conflict";
+                      throw err;
                     }
                   }
                 }
@@ -5915,18 +6831,10 @@
                   // hoặc dữ liệu đã khác snapshot ban đầu (curVersion !== staging.previousVersion) và manifest chưa match:
                   if (!isManifestMatched && prevGenBeforeLock > stagingGen && curVersion !== staging.previousVersion && curVersion !== candidateVer) {
                     console.error("[Crash Recovery] CAS Mismatch: Dữ liệu đã bị transaction mới hơn sửa đổi (activeGen > stagingGen). CẤM GHI ĐÈ để chống mất dữ liệu mới!");
-                    try {
-                      safeSetAndVerify("cva_migration_error", JSON.stringify({
-                        timestamp: Date.now(),
-                        stage: "crash_recovery_committed_cas_conflict",
-                        error: "CAS mismatch: storage state modified by subsequent transaction",
-                        curVersion,
-                        stagingVersion: candidateVer,
-                        stagingGen,
-                        activeGen: prevGenBeforeLock
-                      }));
-                    } catch(e) { console.warn(e); }
-                    return { recovered: false, error: "CAS mismatch: storage state modified by subsequent transaction (Fail-Closed)" };
+                    const err = new Error("CAS mismatch: storage state modified by subsequent transaction (Fail-Closed)");
+                    err.errorKey = "cva_migration_error";
+                    err.stage = "crash_recovery_committed_cas_conflict";
+                    throw err;
                   }
 
                   const unifiedStorePayload = JSON.stringify({
@@ -5998,18 +6906,10 @@
                   migrationResult = { recovered: false, clean: true, reason: "Stale generation staging superseded by verified committed transaction" };
                 } else {
                   console.error("[Crash Recovery] Cảnh báo: generation tăng (" + prevGenBeforeLock + " > " + stagingGen + ") nhưng chưa có giao dịch mới nào commit hoàn tất. Kích hoạt Fail-Closed bảo lưu WAL!");
-                  try {
-                    safeSetAndVerify("cva_migration_error", JSON.stringify({
-                      timestamp: Date.now(),
-                      stage: "crash_recovery_unverified_superseded_staging",
-                      error: "Active generation increased but no newer transaction committed (Fail-Closed)",
-                      stagingGen,
-                      activeGen: prevGenBeforeLock,
-                      curVersion,
-                      previousVersion: staging.previousVersion
-                    }));
-                  } catch(e) { console.warn(e); }
-                  return { recovered: false, error: "Unverified superseded staging: generation advanced without committed transaction (Fail-Closed)" };
+                  const err = new Error("Unverified superseded staging: generation advanced without committed transaction (Fail-Closed)");
+                  err.errorKey = "cva_migration_error";
+                  err.stage = "crash_recovery_unverified_superseded_staging";
+                  throw err;
                 }
               } else {
                 // Fingerprint & Revision Verification (Anti-Blind-Rollback Gatekeeper)
@@ -6049,20 +6949,10 @@
 
                 if (catsMismatch || linksMismatch || verMismatch || storeExternalMismatch) {
                   console.error("[Crash Recovery] Fingerprint mismatch: Dữ liệu hiện tại trên storage bị sửa đổi bởi một giao dịch khác ngoài staging. Kích hoạt Fail-Closed!");
-                  try {
-                    safeSetAndVerify("cva_migration_error", JSON.stringify({
-                      timestamp: Date.now(),
-                      stage: "crash_recovery_fingerprint_mismatch",
-                      error: "Storage fingerprint modified outside staging footprint (Fail-Closed, manual recovery required)",
-                      stagingGen,
-                      activeGen: prevGenBeforeLock,
-                      catsMismatch,
-                      linksMismatch,
-                      verMismatch,
-                      storeMismatch: storeExternalMismatch
-                    }));
-                  } catch(e) { console.warn(e); }
-                  return { recovered: false, error: "Fingerprint mismatch: storage modified outside staging footprint (Fail-Closed, manual recovery required)" };
+                  const err = new Error("Fingerprint mismatch: storage modified outside staging footprint (Fail-Closed, manual recovery required)");
+                  err.errorKey = "cva_migration_error";
+                  err.stage = "crash_recovery_fingerprint_mismatch";
+                  throw err;
                 }
 
                 console.warn("[Crash Recovery] Phát hiện giao dịch bị ngắt giữa chừng (status: prepared). Kích hoạt Rollback toàn bộ với Read-After-Write verification...");
@@ -6118,15 +7008,11 @@
 
                 if (rollbackErrors.length > 0) {
                   console.error("[Crash Recovery] Rollback thất bại một hoặc nhiều khóa:", rollbackErrors);
-                  try {
-                    safeSetAndVerify("cva_migration_error", JSON.stringify({
-                      timestamp: Date.now(),
-                      stage: "crash_recovery_rollback_failed",
-                      error: "Không thể khôi phục snapshot cũ sau crash",
-                      rollbackErrors
-                    }));
-                  } catch(e) { console.warn(e); }
-                  return { recovered: false, error: "Rollback failed during crash recovery" };
+                  const err = new Error("Rollback failed during crash recovery");
+                  err.errorKey = "cva_migration_error";
+                  err.stage = "crash_recovery_rollback_failed";
+                  err.rollbackErrors = rollbackErrors;
+                  throw err;
                 }
 
                 migrationRecovered = true;
@@ -6134,23 +7020,81 @@
               }
             } else {
               console.error("[Crash Recovery] Trạng thái staging không xác định (status=" + staging.status + "). Giữ staging để chẩn đoán.");
-              try {
-                safeSetAndVerify("cva_migration_error", JSON.stringify({
-                  timestamp: Date.now(),
-                  stage: "crash_recovery_unknown_status",
-                  status: staging.status
-                }));
-              } catch(e) { console.warn(e); }
-              return { recovered: false, error: "Unknown staging status (Fail-Closed)" };
+              const err = new Error("Unknown staging status (Fail-Closed)");
+              err.errorKey = "cva_migration_error";
+              err.stage = "crash_recovery_unknown_status";
+              throw err;
+            }
+          }
+
+          // 2.5 Khôi phục giao dịch Auth dở dang nếu có (cva_auth_staging)
+          let authRecovered = false;
+          if (preValAuth) {
+            try {
+              if (preValAuth._supersededAndCommitted) {
+                console.log("[Crash Recovery] cva_auth_staging đã được superseded bởi transaction mới hơn, bỏ qua ghi đè.");
+                authRecovered = true;
+              } else {
+                // Kiểm tra 4 tầng an toàn trước khi ghi/xóa
+                if (!activeLockCtx || activeLockCtx.revoked) {
+                  throw new Error("StorageLockUnavailable: recovery lock revoked before auth recovery (Fail-Closed)");
+                }
+                if (!verifyRecoveryLock()) {
+                  throw new Error("FencingViolation: recovery lock superseded before auth recovery (Fail-Closed)");
+                }
+                if (preValAuth.generation !== myRecoveryGen || preValAuth.token !== myRecoveryToken) {
+                  throw new Error("FencingViolation: auth staging ownership token/generation mismatch with recovery context (Fail-Closed)");
+                }
+
+                const valRes = (typeof validateAuthStagingPayload === "function")
+                  ? validateAuthStagingPayload(preValAuth)
+                  : validateAuthStagingLocal(preValAuth);
+                if (!valRes.valid) {
+                  throw new Error("AuthStagingInconsistency: " + valRes.reason + " (Fail-Closed)");
+                }
+
+                const authStage = preValAuth.stage;
+                if (authStage === "auth_lockout") {
+                  safeSetAndVerify("teacher_hub_auth_fails", String(preValAuth.fails));
+                  safeSetAndVerify("teacher_hub_lock_until", String(preValAuth.lockUntil));
+                  safeSetAndVerify("teacher_hub_auth_generation", String(myRecoveryGen));
+                  safeSetAndVerify("teacher_hub_auth_token", myRecoveryToken);
+                  authRecovered = true;
+                  console.log(`[Crash Recovery] Khôi phục thành công auth_lockout: fails=${preValAuth.fails}, lockUntil=${preValAuth.lockUntil}`);
+                } else if (authStage === "auth_failure_increment") {
+                  safeSetAndVerify("teacher_hub_auth_fails", String(preValAuth.fails));
+                  safeSetAndVerify("teacher_hub_auth_generation", String(myRecoveryGen));
+                  safeSetAndVerify("teacher_hub_auth_token", myRecoveryToken);
+                  authRecovered = true;
+                  console.log(`[Crash Recovery] Khôi phục thành công auth_failure_increment: fails=${preValAuth.fails}`);
+                } else if (authStage === "reset_auth_failures") {
+                  safeRemoveAndVerify("teacher_hub_auth_fails");
+                  safeRemoveAndVerify("teacher_hub_lock_until");
+                  safeSetAndVerify("teacher_hub_auth_generation", String(myRecoveryGen));
+                  safeSetAndVerify("teacher_hub_auth_token", myRecoveryToken);
+                  authRecovered = true;
+                  console.log("[Crash Recovery] Khôi phục thành công reset_auth_failures.");
+                }
+
+                const postVal = (typeof validateStoredAuthState === "function") ? validateStoredAuthState(localStorage) : { valid: true };
+                if (!postVal.valid) {
+                  throw new Error("PostRecoveryAuthStateCorrupted: " + postVal.reason);
+                }
+              }
+            } catch (authErr) {
+              console.error("[Crash Recovery] Lỗi xử lý cva_auth_staging, chuyển tiếp tới Phase 2 coordinator:", authErr);
+              authErr.errorKey = "cva_auth_error";
+              authErr.stage = "auth_crash_recovery_general_error";
+              throw authErr;
             }
           }
 
           // ═══════════════════════════════════════════════════════════════
-          // 2.5 BATCH STAGING CLEANUP:
+          // 2.6 BATCH STAGING CLEANUP:
           // Chỉ dọn sạch các staging records KHI VÀ CHỈ KHI TOÀN BỘ các transaction trong batch
           // đã thực thi thành công 100% và vượt qua kiểm định Read-After-Write.
           // Nếu bất kỳ bước nào gặp lỗi đĩa/quota, exception sẽ nhảy vào catch,
-          // TOÀN BỘ staging records được BẢO LƯU NGUYÊN VẸN để phục vụ lần khởi động sau.
+          // TOÀN BỘ staging records được BẢO LƯU NGUYẸN VẸN để phục vụ lần khởi động sau.
           // ═══════════════════════════════════════════════════════════════
           if (preValVault && (vaultRecovered || preValVault._supersededAndCommitted)) {
             safeRemoveAndVerify("cva_vault_staging");
@@ -6168,22 +7112,44 @@
             safeRemoveAndVerify(MIGRATION_STAGING_KEY);
             try { safeRemoveAndVerify("cva_migration_error"); } catch(e) { console.warn("[Crash Recovery] Lỗi xóa cva_migration_error:", e); }
           }
+          if (preValAuth && (authRecovered || preValAuth._supersededAndCommitted)) {
+            if (!activeLockCtx || activeLockCtx.revoked) {
+              throw new Error("StorageLockUnavailable: recovery lock revoked before clearing cva_auth_staging (Fail-Closed)");
+            }
+            if (!verifyRecoveryLock()) {
+              throw new Error("FencingViolation: recovery lock superseded before clearing cva_auth_staging (Fail-Closed)");
+            }
+            safeRemoveAndVerify("cva_auth_staging");
+            try { safeRemoveAndVerify("cva_auth_error"); } catch(e) { console.warn("[Crash Recovery] Lỗi xóa cva_auth_error:", e); }
+          }
 
           if (migrationResult) return migrationResult;
-          return { recovered: vaultRecovered || storeRecovered || syncRecovered, clean: true };
+          return { recovered: vaultRecovered || storeRecovered || syncRecovered || authRecovered, clean: true };
 
         } catch(recErr) {
-          console.error("[Crash Recovery] Lỗi ngoại lệ trong quá trình crash recovery:", recErr);
+          console.error("[Crash Recovery] Lỗi ngoại lệ trong quá trình Phase 2 crash recovery, rollback toàn bộ về prePhase2:", recErr);
           try {
-            safeSetAndVerify("cva_migration_error", JSON.stringify({
-              timestamp: Date.now(),
-              stage: "crash_recovery_exception",
-              error: recErr.message
-            }));
+            rollbackAllToPrePhase2();
+          } catch(rbErr) {
+            console.error("[Crash Recovery] Rollback thất bại nghiêm trọng:", rbErr);
+          }
+          const errKey = recErr.errorKey || "cva_migration_error";
+          const errStage = recErr.stage || "crash_recovery_exception";
+          try {
+            if (verifyRecoveryLock()) {
+              safeSetAndVerify(errKey, JSON.stringify({
+                timestamp: Date.now(),
+                stage: errStage,
+                error: recErr.message || String(recErr),
+                ...(recErr.rollbackErrors ? { rollbackErrors: recErr.rollbackErrors } : {})
+              }));
+            } else {
+              console.warn("[Crash Recovery] Bỏ qua ghi cờ lỗi vì verifyRecoveryLock thất bại (Lock superseded):", errKey);
+            }
           } catch(e) {
             console.error("[Crash Recovery] Không thể ghi cờ lỗi:", e);
           }
-          return { recovered: false, error: recErr.message };
+          return { recovered: false, error: recErr.message || String(recErr) };
         }
       }
 
@@ -6260,7 +7226,7 @@
                   if (preGen !== myGen || preTok !== myTok) {
                     throw new Error("FencingViolation: active fencing lost before removing " + k);
                   }
-                  localStorage.removeItem(k);
+                  safeStorageRemove(k);
                   if (typeof activeLock.verifyFencing === "function" && !activeLock.verifyFencing()) {
                     throw new Error("FencingViolation: verifyFencing failed after removing " + k);
                   }
@@ -6431,7 +7397,7 @@
           if (!verifyFencing()) {
             throw new Error(`FencingViolation: cannot remove ${key}, active fencing changed`);
           }
-          localStorage.removeItem(key);
+          safeStorageRemove(key);
           if (!verifyFencing()) {
             throw new Error(`FencingViolation: fencing changed during remove on ${key}`);
           }
@@ -6444,6 +7410,7 @@
           const prevSalt = localStorage.getItem("teacher_hub_vault_salt");
           const prevCipher = localStorage.getItem("teacher_hub_vault_enc_v2");
           const prevEnvelope = localStorage.getItem("teacher_hub_vault_envelope_v1");
+          const prevLegacy = localStorage.getItem("teacher_hub_vault_v1");
 
           let salt = prevSalt;
           if (!salt) {
@@ -6459,7 +7426,7 @@
             updatedAt: Date.now()
           });
 
-          // 1. WAL 2PC: Ghi staging prepared với đầy đủ metadata bắt buộc
+          // 1. WAL 2PC: Ghi staging prepared với đầy đủ metadata bắt buộc bao gồm legacy plaintext
           const vChecksum = computeTxChecksum(null, null, "vault_v1", null, { salt, ciphertext: encryptedString });
           const vaultStaging = {
             status: "prepared",
@@ -6474,7 +7441,8 @@
             previous: {
               salt: prevSalt,
               ciphertext: prevCipher,
-              envelope: prevEnvelope
+              envelope: prevEnvelope,
+              legacyPlaintext: prevLegacy
             }
           };
           safeFencedSet("cva_vault_staging", JSON.stringify(vaultStaging));
@@ -6485,18 +7453,20 @@
             safeFencedSet("teacher_hub_vault_salt", salt);
             safeFencedSet("teacher_hub_vault_enc_v2", encryptedString);
 
-            // Xóa bỏ an toàn bản văn bản thô cũ và xác minh đã xóa hoàn toàn (Zero Plaintext Gatekeeper)
-            safeFencedRemove("teacher_hub_vault_v1");
-            if (localStorage.getItem("teacher_hub_vault_v1") !== null) {
-              throw new Error("ZeroPlaintextViolation: teacher_hub_vault_v1 could not be deleted");
-            }
-
-            // 3. Mark committed before cleanup
+            // 3. Mark committed before removing legacy plaintext or cleanup
             vaultStaging.status = "committed";
             vaultStaging.time = Date.now();
             safeFencedSet("cva_vault_staging", JSON.stringify(vaultStaging));
 
-            // 4. Dọn sạch staging sau khi committed và verify thành công
+            // 4. Zero Plaintext Gatekeeper: Chỉ xóa bỏ bản plaintext legacy SAU KHI encrypted record đã committed an toàn 100%
+            if (prevLegacy !== null) {
+              safeFencedRemove("teacher_hub_vault_v1");
+              if (localStorage.getItem("teacher_hub_vault_v1") !== null) {
+                throw new Error("ZeroPlaintextViolation: teacher_hub_vault_v1 could not be deleted");
+              }
+            }
+
+            // 5. Dọn sạch staging sau khi committed và verify thành công
             safeFencedRemove("cva_vault_staging");
             try { safeFencedRemove("cva_vault_error"); } catch(e) { console.warn("[Vault] Lỗi xóa cva_vault_error:", e); }
           } catch (writeErr) {
@@ -6511,7 +7481,7 @@
               throw writeErr;
             }
 
-            // Rollback an toàn toàn bộ các khóa về snapshot cũ nếu vẫn giữ fence
+            // Rollback an toàn toàn bộ các khóa về snapshot cũ nếu vẫn giữ fence (kể cả legacy plaintext)
             try {
               if (prevEnvelope !== null) safeFencedSet("teacher_hub_vault_envelope_v1", prevEnvelope);
               else safeFencedRemove("teacher_hub_vault_envelope_v1");
@@ -6521,6 +7491,8 @@
 
               if (prevCipher !== null) safeFencedSet("teacher_hub_vault_enc_v2", prevCipher);
               else safeFencedRemove("teacher_hub_vault_enc_v2");
+
+              if (prevLegacy !== null) safeFencedSet("teacher_hub_vault_v1", prevLegacy);
 
               safeFencedRemove("cva_vault_staging");
             } catch(rollbackErr) {
@@ -6997,6 +7969,9 @@
               await saveToStorage(lockCtx);
               renderItems();
               showToast(`Đã xóa "${item.title}"`);
+              if (isAdminLoggedIn && !isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
+                syncAdminChangesToCloud(true).catch(e => console.warn("[CloudSync] Auto-sync del link error:", e));
+              }
             });
           } catch(lockErr) {
             console.error("[Storage] Lỗi Web Lock khi xóa website:", lockErr);
@@ -7122,6 +8097,9 @@
                 showToast(`Đã cập nhật link "${title}"!`);
               } else {
                 showToast(`Đã thêm "${title}" vào danh sách!`);
+              }
+              if (isAdminLoggedIn && !isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
+                syncAdminChangesToCloud(true).catch(e => console.warn("[CloudSync] Auto-sync save link error:", e));
               }
             });
           } catch(lockErr) {
@@ -7601,6 +8579,8 @@
 
       const btnExportFullBackup = document.getElementById("btnExportFullBackup");
       const btnImportFullBackup = document.getElementById("btnImportFullBackup");
+      const btnExportGitHubConfig = document.getElementById("btnExportGitHubConfig");
+      const btnCloudSyncAdmin = document.getElementById("btnCloudSyncAdmin");
       const btnSyncSystemDefaults = document.getElementById("btnSyncSystemDefaults");
       const btnRestoreOriginalDefaults = document.getElementById("btnRestoreOriginalDefaults");
       const fileInput = document.getElementById("phoneFileInput");
@@ -7841,7 +8821,7 @@
               if (!verifySyncFencing()) {
                 throw new Error(`FencingViolation: generation ${mySyncGen} bị vượt quyền trước khi xóa ${k}`);
               }
-              localStorage.removeItem(k);
+              safeStorageRemove(k);
               const readBack = localStorage.getItem(k);
               if (readBack !== null) {
                 throw new Error(`ReadAfterDeleteFailure trên key ${k}`);
@@ -7852,22 +8832,31 @@
               return true;
             }
 
+            isSyncTransactionActive = true;
             try {
-              // 1. Chuẩn bị trước toàn bộ serialized payloads và checksum bao gồm cả 4 thực thể
-              const catPayload = JSON.stringify(imported.categories);
-              const linkPayload = JSON.stringify(imported.links);
-              const remPayload = JSON.stringify(imported.reminders);
-              const ttPayload = JSON.stringify(imported.timetable);
-              const txChecksum = computeTxChecksum(imported.categories, imported.links, CURRENT_DATA_VERSION, imported.reminders, imported.timetable);
+              // 1. Chuẩn bị trước toàn bộ serialized payloads và checksum bao gồm cả 4 thực thể (với Schema Normalization)
+              const normalizedCategories = Array.isArray(imported.categories) ? imported.categories : [];
+              const normalizedLinks = (Array.isArray(imported.links) ? imported.links : []).map(l => ({
+                ...l,
+                category: (typeof l.category === "string" && l.category.trim() !== "") ? l.category.trim() : "all"
+              }));
+              const normalizedReminders = Array.isArray(imported.reminders) ? imported.reminders : [];
+              const normalizedTimetable = (imported.timetable && typeof imported.timetable === "object") ? imported.timetable : {};
+
+              const catPayload = JSON.stringify(normalizedCategories);
+              const linkPayload = JSON.stringify(normalizedLinks);
+              const remPayload = JSON.stringify(normalizedReminders);
+              const ttPayload = JSON.stringify(normalizedTimetable);
+              const txChecksum = computeTxChecksum(normalizedCategories, normalizedLinks, CURRENT_DATA_VERSION, normalizedReminders, normalizedTimetable);
               const unifiedPayload = JSON.stringify({
                 schemaVersion: 2,
                 version: CURRENT_DATA_VERSION,
                 generation: mySyncGen,
                 token: syncToken,
-                categories: imported.categories,
-                links: imported.links,
-                reminders: imported.reminders,
-                timetable: imported.timetable,
+                categories: normalizedCategories,
+                links: normalizedLinks,
+                reminders: normalizedReminders,
+                timetable: normalizedTimetable,
                 checksum: txChecksum,
                 time: Date.now()
               });
@@ -7883,10 +8872,10 @@
                 token: syncToken,
                 fencingGeneration: mySyncGen,
                 time: Date.now(),
-                categories: imported.categories,
-                links: imported.links,
-                reminders: imported.reminders,
-                timetable: imported.timetable,
+                categories: normalizedCategories,
+                links: normalizedLinks,
+                reminders: normalizedReminders,
+                timetable: normalizedTimetable,
                 checksum: txChecksum,
                 previous: snapshot
               };
@@ -8008,6 +8997,8 @@
                 showToast("Lỗi đồng bộ nghiêm trọng! Hệ thống đã bật Chế độ An toàn.", "error");
               }
               return false;
+            } finally {
+              isSyncTransactionActive = false;
             }
           };
 
@@ -8160,17 +9151,66 @@
           return await navigator.locks.request("cva_storage_exclusive_lock", { mode: "exclusive" }, async () => {
             syncMemoryFromLatestStorage();
 
-            const prevGen = Number(localStorage.getItem("cva_fencing_generation") || 0);
+            const prevGenRaw = localStorage.getItem("cva_fencing_generation");
+            const prevTokRaw = localStorage.getItem("cva_fencing_token");
+            const prevLockRaw = localStorage.getItem("cva_migration_lock");
+
+            const prevGen = Number(prevGenRaw || 0);
             const generation = (Number.isInteger(prevGen) && prevGen > 0 ? prevGen : 0) + 1;
             const token = "lock_tok_" + Math.random().toString(36).substring(2) + "_" + Date.now();
-
-            localStorage.setItem("cva_fencing_generation", String(generation));
-            localStorage.setItem("cva_fencing_token", token);
-            localStorage.setItem("cva_migration_lock", JSON.stringify({
+            const lockPayload = JSON.stringify({
               token,
               generation,
               time: Date.now()
-            }));
+            });
+
+            try {
+              localStorage.setItem("cva_fencing_generation", String(generation));
+              localStorage.setItem("cva_fencing_token", token);
+              localStorage.setItem("cva_migration_lock", lockPayload);
+
+              // Read-after-write verification (Fail-Closed Fencing Invariant)
+              const vGen = Number(localStorage.getItem("cva_fencing_generation") || 0);
+              const vTok = localStorage.getItem("cva_fencing_token");
+              const vLock = localStorage.getItem("cva_migration_lock");
+              if (vGen !== generation || vTok !== token || vLock !== lockPayload) {
+                throw new Error("StorageLockAcquisitionFailed: Read-after-write failed on fencing markers");
+              }
+            } catch(markerErr) {
+              console.error("[Storage] Không thể ghi marker fencing có kiểm tra (Fail-Closed):", markerErr);
+              let markerRollbackFailed = false;
+              try {
+                if (prevGenRaw !== null) localStorage.setItem("cva_fencing_generation", prevGenRaw);
+                else safeStorageRemove("cva_fencing_generation");
+
+                if (prevTokRaw !== null) localStorage.setItem("cva_fencing_token", prevTokRaw);
+                else safeStorageRemove("cva_fencing_token");
+
+                if (prevLockRaw !== null) localStorage.setItem("cva_migration_lock", prevLockRaw);
+                else safeStorageRemove("cva_migration_lock");
+              } catch(rbMarkerErr) {
+                console.error("[Storage] Rollback fencing markers thất bại, đánh dấu cva_fencing_corrupt:", rbMarkerErr);
+                markerRollbackFailed = true;
+                try {
+                  localStorage.setItem("cva_fencing_corrupt", JSON.stringify({
+                    time: Date.now(),
+                    error: markerErr ? markerErr.message : String(markerErr),
+                    rollbackError: rbMarkerErr ? rbMarkerErr.message : String(rbMarkerErr)
+                  }));
+                } catch(eCorrupt) { console.warn(eCorrupt); }
+              }
+
+              try {
+                localStorage.setItem("cva_migration_lock_acquisition_failed", JSON.stringify({
+                  token,
+                  generation,
+                  time: Date.now(),
+                  error: markerErr ? markerErr.message : String(markerErr),
+                  markerRollbackFailed
+                }));
+              } catch(e) { console.warn(e); }
+              throw markerErr;
+            }
 
             const lockCtx = {
               generation,
@@ -8178,34 +9218,272 @@
               revoked: false,
               verifyFencing: () => {
                 if (lockCtx.revoked) return false;
-                const curGen = Number(localStorage.getItem("cva_fencing_generation") || 0);
+                const curGenRaw = localStorage.getItem("cva_fencing_generation");
                 const curTok = localStorage.getItem("cva_fencing_token");
                 const curLockRaw = localStorage.getItem("cva_migration_lock");
-                if (!curLockRaw) return false;
+                if (!curLockRaw || curGenRaw === null || curTok === null) return false;
+                const curGen = Number(curGenRaw);
+                if (!Number.isSafeInteger(curGen) || curGen !== generation || curTok !== token) return false;
                 try {
                   const p = JSON.parse(curLockRaw);
-                  if (!p || typeof p !== "object" || p.token !== token || Number(p.generation) !== generation) return false;
+                  if (!p || typeof p !== "object" || Array.isArray(p) || p.token !== token || typeof p.generation !== "number" || !Number.isSafeInteger(p.generation) || p.generation !== generation) return false;
                 } catch {
                   return false;
                 }
-                return curGen === generation && curTok === token;
+                return true;
               }
             };
+
+            function safeFencedRemoveLock(key, expectedToken, expectedGen, ctx) {
+              if (!ctx || ctx.revoked) {
+                console.warn("[Storage] Không thể xóa lock khi lockCtx đã bị revoked hoặc null (Fail-Closed):", key);
+                try {
+                  localStorage.setItem("cva_migration_lock_cleanup_failed", JSON.stringify({
+                    token: expectedToken,
+                    generation: expectedGen,
+                    time: Date.now(),
+                    reason: "LockContextRevokedBeforeCleanup"
+                  }));
+                } catch(eFlag) {
+                  console.error("[Storage] Không thể ghi cờ cva_migration_lock_cleanup_failed:", eFlag);
+                  isStorageDegraded = true;
+                  if (typeof showDegradedStorageBanner === "function") {
+                    showDegradedStorageBanner("Lỗi lưu trữ: Không thể lưu cờ chẩn đoán dọn khóa (Fail-Closed).");
+                  }
+                }
+                return false;
+              }
+              if (typeof ctx.verifyFencing === "function" && !ctx.verifyFencing()) {
+                console.warn("[Storage] verifyFencing thất bại trước khi xóa lock (Fail-Closed):", key);
+                try {
+                  localStorage.setItem("cva_migration_lock_cleanup_failed", JSON.stringify({
+                    token: expectedToken,
+                    generation: expectedGen,
+                    time: Date.now(),
+                    reason: "LockContextVerifyFencingFailed"
+                  }));
+                } catch(eFlag) {
+                  console.error("[Storage] Không thể ghi cờ cva_migration_lock_cleanup_failed:", eFlag);
+                  isStorageDegraded = true;
+                  if (typeof showDegradedStorageBanner === "function") {
+                    showDegradedStorageBanner("Lỗi lưu trữ: Không thể lưu cờ chẩn đoán dọn khóa (Fail-Closed).");
+                  }
+                }
+                return false;
+              }
+
+              // 1. Initial Ownership Validation
+              const curGen = Number(localStorage.getItem("cva_fencing_generation") || 0);
+              const curTok = localStorage.getItem("cva_fencing_token");
+              const curLockRaw = localStorage.getItem(key);
+              if (curGen !== expectedGen || curTok !== expectedToken || !curLockRaw) {
+                console.warn("[Storage] Fencing token/generation không khớp hoặc marker bị thiếu trước khi xóa lock:", { curGen, curTok, expectedGen, expectedToken });
+                try {
+                  localStorage.setItem("cva_migration_lock_cleanup_failed", JSON.stringify({
+                    token: expectedToken,
+                    generation: expectedGen,
+                    time: Date.now(),
+                    reason: "FencingOwnershipMismatchBeforeDelete",
+                    curGen,
+                    curTok
+                  }));
+                } catch(eFlag) {
+                  console.error("[Storage] Không thể ghi cờ cva_migration_lock_cleanup_failed:", eFlag);
+                  isStorageDegraded = true;
+                  if (typeof showDegradedStorageBanner === "function") {
+                    showDegradedStorageBanner("Lỗi lưu trữ: Không thể lưu cờ chẩn đoán dọn khóa (Fail-Closed).");
+                  }
+                }
+                return false;
+              }
+              let ownershipProven = false;
+              try {
+                const p = JSON.parse(curLockRaw);
+                if (p && p.token === expectedToken && Number(p.generation) === expectedGen) {
+                  ownershipProven = true;
+                }
+              } catch(eParse) {
+                console.warn("[Storage] Không thể phân tích cva_migration_lock để chứng minh quyền sở hữu, bảo lưu marker để phục vụ chẩn đoán:", eParse);
+                try {
+                  localStorage.setItem("cva_migration_lock_cleanup_failed", JSON.stringify({
+                    token: expectedToken,
+                    generation: expectedGen,
+                    time: Date.now(),
+                    error: eParse.message,
+                    reason: "LockPayloadCorrupted"
+                  }));
+                } catch(eFlag) {
+                  console.error("[Storage] Không thể ghi cờ cva_migration_lock_cleanup_failed:", eFlag);
+                  isStorageDegraded = true;
+                  if (typeof showDegradedStorageBanner === "function") {
+                    showDegradedStorageBanner("Lỗi lưu trữ: Không thể lưu cờ chẩn đoán dọn khóa (Fail-Closed).");
+                  }
+                }
+                return false;
+              }
+              if (!ownershipProven) {
+                console.warn("[Storage] Marker ownership mismatch trước khi xóa lock:", curLockRaw);
+                try {
+                  localStorage.setItem("cva_migration_lock_cleanup_failed", JSON.stringify({
+                    token: expectedToken,
+                    generation: expectedGen,
+                    time: Date.now(),
+                    reason: "MarkerPayloadMismatch"
+                  }));
+                } catch(eFlag) {
+                  console.error("[Storage] Không thể ghi cờ cva_migration_lock_cleanup_failed:", eFlag);
+                  isStorageDegraded = true;
+                  if (typeof showDegradedStorageBanner === "function") {
+                    showDegradedStorageBanner("Lỗi lưu trữ: Không thể lưu cờ chẩn đoán dọn khóa (Fail-Closed).");
+                  }
+                }
+                return false;
+              }
+
+              // Điểm can thiệp thử nghiệm Adversarial Preemption Interleaving (nếu có hook)
+              const advHook = (typeof window !== "undefined" && window.__adversarialPreDeleteHook) ||
+                              (typeof globalThis !== "undefined" && globalThis.__adversarialPreDeleteHook);
+              if (typeof advHook === "function") {
+                try { advHook(); } catch(eHook) { console.warn(eHook); }
+              }
+
+              // 2. Atomic CAS Gatekeeper ngay trước lệnh xóa (Anti-TOCTOU Gatekeeper):
+              // Kiểm tra lại toàn bộ 3 marker thế hệ, token và nội dung lock.
+              // Nếu Tab B can thiệp giữa chừng (TOCTOU preemption), DỪNG NGAY LẬP TỨC, CẤM XÓA MARKER CỦA TAB B!
+              const finalGen = Number(localStorage.getItem("cva_fencing_generation") || 0);
+              const finalTok = localStorage.getItem("cva_fencing_token");
+              const finalLockRaw = localStorage.getItem(key);
+              if (finalGen !== expectedGen || finalTok !== expectedToken || !finalLockRaw) {
+                console.warn("[Storage] CAS Mismatch trước khi xóa lock: Fencing marker đã bị giao dịch khác thay đổi (Fail-Closed, bảo lưu marker Tab B):", { finalGen, finalTok, expectedGen, expectedToken });
+                try {
+                  localStorage.setItem("cva_migration_lock_cleanup_failed", JSON.stringify({
+                    token: expectedToken,
+                    generation: expectedGen,
+                    time: Date.now(),
+                    reason: "CASPreemptionDetectedBeforeDelete",
+                    finalGen,
+                    finalTok
+                  }));
+                } catch(eFlag) {
+                  console.error("[Storage] Không thể ghi cờ cva_migration_lock_cleanup_failed:", eFlag);
+                  isStorageDegraded = true;
+                  if (typeof showDegradedStorageBanner === "function") {
+                    showDegradedStorageBanner("Lỗi lưu trữ: Không thể lưu cờ chẩn đoán dọn khóa (Fail-Closed).");
+                  }
+                }
+                return false;
+              }
+
+              try {
+                const finalP = JSON.parse(finalLockRaw);
+                if (!finalP || finalP.token !== expectedToken || Number(finalP.generation) !== expectedGen) {
+                  console.warn("[Storage] CAS Mismatch: Marker lock đã thuộc về phiên giao dịch khác trước khi xóa:", finalLockRaw);
+                  try {
+                    localStorage.setItem("cva_migration_lock_cleanup_failed", JSON.stringify({
+                      token: expectedToken,
+                      generation: expectedGen,
+                      time: Date.now(),
+                      reason: "CASLockPayloadMismatchBeforeDelete"
+                    }));
+                  } catch(eFlag) {
+                    console.error("[Storage] Không thể ghi cờ cva_migration_lock_cleanup_failed:", eFlag);
+                    isStorageDegraded = true;
+                    if (typeof showDegradedStorageBanner === "function") {
+                      showDegradedStorageBanner("Lỗi lưu trữ: Không thể lưu cờ chẩn đoán dọn khóa (Fail-Closed).");
+                    }
+                  }
+                  return false;
+                }
+              } catch(eFinalParse) {
+                console.warn("[Storage] CAS Mismatch: Không thể parse marker trước khi xóa:", eFinalParse);
+                try {
+                  localStorage.setItem("cva_migration_lock_cleanup_failed", JSON.stringify({
+                    token: expectedToken,
+                    generation: expectedGen,
+                    time: Date.now(),
+                    error: eFinalParse.message,
+                    reason: "CASLockPayloadCorruptedBeforeDelete"
+                  }));
+                } catch(eFlag) {
+                  console.error("[Storage] Không thể ghi cờ cva_migration_lock_cleanup_failed:", eFlag);
+                  isStorageDegraded = true;
+                  if (typeof showDegradedStorageBanner === "function") {
+                    showDegradedStorageBanner("Lỗi lưu trữ: Không thể lưu cờ chẩn đoán dọn khóa (Fail-Closed).");
+                  }
+                }
+                return false;
+              }
+
+              // 3. Thực hiện xóa KHI VÀ CHỈ KHI cả hai tầng CAS xác nhận quyền sở hữu độc quyền nguyên vẹn
+              safeStorageRemove(key);
+
+              // 4. Read-after-delete verification
+              if (localStorage.getItem(key) !== null) {
+                console.warn("[Storage] Read-after-delete failed on " + key);
+                try {
+                  localStorage.setItem("cva_migration_lock_cleanup_failed", JSON.stringify({
+                    token: expectedToken,
+                    generation: expectedGen,
+                    time: Date.now(),
+                    reason: "ReadAfterDeleteFailure"
+                  }));
+                } catch(eFlag) {
+                  console.error("[Storage] Không thể ghi cờ cva_migration_lock_cleanup_failed:", eFlag);
+                  isStorageDegraded = true;
+                  if (typeof showDegradedStorageBanner === "function") {
+                    showDegradedStorageBanner("Lỗi lưu trữ: Không thể lưu cờ chẩn đoán dọn khóa (Fail-Closed).");
+                  }
+                }
+                return false;
+              }
+
+              // Điểm can thiệp thử nghiệm Adversarial Post-Delete Interleaving (nếu có hook)
+              const advPostHook = (typeof window !== "undefined" && window.__adversarialPostDeleteHook) ||
+                                  (typeof globalThis !== "undefined" && globalThis.__adversarialPostDeleteHook);
+              if (typeof advPostHook === "function") {
+                try { advPostHook(); } catch(eHook) { console.warn(eHook); }
+              }
+
+              // 5. Post-delete Fencing Double-Check Lock Invariant to eliminate TOCTOU race
+              const postDelGen = Number(localStorage.getItem("cva_fencing_generation") || 0);
+              const postDelTok = localStorage.getItem("cva_fencing_token");
+              const postDelLock = localStorage.getItem(key);
+              if (postDelLock !== null || postDelGen !== expectedGen || postDelTok !== expectedToken) {
+                console.warn("[Storage] Post-delete fencing double-check failed on " + key, { postDelGen, postDelTok, expectedGen, expectedToken, postDelLock });
+                try {
+                  localStorage.setItem("cva_migration_lock_cleanup_failed", JSON.stringify({
+                    token: expectedToken,
+                    generation: expectedGen,
+                    time: Date.now(),
+                    reason: "PostDeleteFencingDoubleCheckFailed",
+                    postDelGen,
+                    postDelTok,
+                    postDelLock
+                  }));
+                } catch(eFlag) {
+                  console.error("[Storage] Không thể ghi cờ cva_migration_lock_cleanup_failed:", eFlag);
+                  isStorageDegraded = true;
+                  if (typeof showDegradedStorageBanner === "function") {
+                    showDegradedStorageBanner("Lỗi lưu trữ: Không thể lưu cờ chẩn đoán dọn khóa (Fail-Closed).");
+                  }
+                }
+                return false;
+              }
+
+              return true;
+            }
 
             currentLockContext = lockCtx;
             try {
               return await callback(lockCtx);
             } finally {
+              try {
+                safeFencedRemoveLock("cva_migration_lock", token, generation, lockCtx);
+              } catch(eClean) {
+                console.warn("[Storage] Lỗi dọn cva_migration_lock:", eClean);
+              }
               lockCtx.revoked = true;
               currentLockContext = null;
-              try {
-                const curTok = localStorage.getItem("cva_fencing_token");
-                if (curTok === token) {
-                  localStorage.removeItem("cva_migration_lock");
-                }
-              } catch(e) {
-                console.warn("[Storage] Lỗi dọn cva_migration_lock:", e);
-              }
             }
           });
         }
@@ -8222,14 +9500,26 @@
       if (btnSyncSystemDefaults) {
         const executeSyncDefaults = async () => {
           if (confirm("Kiểm tra và cập nhật các liên kết mới nhất từ hệ thống? (Các liên kết và thông tin cá nhân do Thầy/Cô tự thêm hoặc chỉnh sửa sẽ được bảo toàn 100%)")) {
+            if (!isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
+              try {
+                const cloudRes = await checkCloudSystemUpdates(true);
+                if (cloudRes && cloudRes.success) {
+                  refreshAllAfterSync();
+                  closeSyncModal();
+                  return;
+                }
+              } catch(eCloud) {
+                console.warn("[CloudSync] Không thể đồng bộ qua Cloud, chuyển sang cập nhật nội bộ:", eCloud);
+              }
+            }
             try {
               await executeWithCrossTabLock(async (lockCtx) => {
                 const res = performAtomicSystemMigration(true, lockCtx);
                 if (res.success) {
                   refreshAllAfterSync();
                   closeSyncModal();
-                  if (res.addedCount > 0) {
-                    showToast(`✅ Đã cập nhật bổ sung ${res.addedCount} liên kết mới từ hệ thống!`);
+                  if (res.addedCount > 0 || res.updatedCount > 0) {
+                    showToast(`✅ Đã cập nhật ${res.updatedCount || 0} và thêm ${res.addedCount || 0} liên kết mới!`);
                   } else {
                     showToast("ℹ️ Danh sách liên kết đã ở phiên bản mới nhất!");
                   }
@@ -8250,6 +9540,63 @@
             return;
           }
           executeSyncDefaults();
+        });
+      }
+
+      if (btnExportGitHubConfig) {
+        const executeExportGitHub = () => {
+          try {
+            const cleanCats = categoriesData.map(c => ({
+              id: c.id,
+              label: c.label,
+              icon: c.icon,
+              ...(c.system ? { system: true } : {})
+            }));
+            const cleanLinks = linksData.map(l => ({
+              id: l.id,
+              title: l.title,
+              url: l.url,
+              category: l.category,
+              color: l.color,
+              iconChar: l.iconChar,
+              isFavorite: Boolean(l.isFavorite)
+            }));
+            const configCode = `// CẤU HÌNH DỮ LIỆU CHUẨN XUẤT BẢN GITHUB CHO TOÀN TRƯỜNG\n// Thời gian xuất: ${new Date().toLocaleString("vi-VN")}\nconst DEFAULT_CATEGORIES = ${JSON.stringify(cleanCats, null, 2)};\n\nconst DEFAULT_LINKS = ${JSON.stringify(cleanLinks, null, 2)};\n`;
+            copyText(configCode);
+            showToast("👑 Đã sao chép cấu hình GitHub vào bộ nhớ tạm!");
+            closeSyncModal();
+          } catch(e) {
+            console.error("[ExportGitHub] Lỗi xuất cấu hình:", e);
+            showToast("❌ Không thể xuất cấu hình: " + e.message, "error");
+          }
+        };
+
+        btnExportGitHubConfig.addEventListener("click", () => {
+          if (!isAdminLoggedIn) {
+            showToast("🔐 Vui lòng đăng nhập Admin để xuất cấu hình GitHub!", "warning");
+            openAdminAuthModal(executeExportGitHub, "export_github");
+            return;
+          }
+          executeExportGitHub();
+        });
+      }
+
+      if (btnCloudSyncAdmin) {
+        const executeCloudSync = async () => {
+          showToast("☁️ Đang phát hành dữ liệu lên đám mây toàn trường...", "info");
+          const syncRes = await syncAdminChangesToCloud(false);
+          if (syncRes && syncRes.success) {
+            closeSyncModal();
+          }
+        };
+
+        btnCloudSyncAdmin.addEventListener("click", () => {
+          if (!isAdminLoggedIn) {
+            showToast("🔐 Vui lòng đăng nhập Admin để phát hành dữ liệu lên đám mây!", "warning");
+            openAdminAuthModal(executeCloudSync, "cloud_sync");
+            return;
+          }
+          executeCloudSync();
         });
       }
 
@@ -8526,7 +9873,7 @@
             sessionVaultPin = entered;
             isVaultUnlocked = true;
             await saveVaultStorage();
-            resetAuthFailures();
+            await resetAuthFailures();
             closeVaultUnlockModal();
             showToast("🛡️ Đã thiết lập Master PIN và kích hoạt Mã Hóa AES-256!");
             if (pendingVaultCallback) pendingVaultCallback();
@@ -8537,13 +9884,13 @@
           // Xác thực mã PIN đã có
           const enteredHash = await hashPassword(entered, salt);
           if (enteredHash !== storedHash) {
-            recordAuthFailure();
+            await recordAuthFailure();
             vaultUnlockPinInput.select();
             return;
           }
 
           // PIN đúng: Giải mã sổ tay vào RAM
-          resetAuthFailures();
+          await resetAuthFailures();
           sessionVaultPin = entered;
           try {
             const cipher = (envelope && envelope.ciphertext) ? envelope.ciphertext : localStorage.getItem("teacher_hub_vault_enc_v2");
@@ -9322,6 +10669,9 @@
                   await saveCategoriesStorage(lockCtx);
                   renderCategoryManageList();
                   renderCategoryTabs();
+                  if (isAdminLoggedIn && !isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
+                    syncAdminChangesToCloud(true).catch(e => console.warn("[CloudSync] Auto-sync cat move error:", e));
+                  }
                 });
               } catch(lockErr) {
                 console.error("[Storage] Lỗi Web Lock khi di chuyển danh mục:", lockErr);
@@ -9342,6 +10692,9 @@
                   await saveCategoriesStorage(lockCtx);
                   renderCategoryManageList();
                   renderCategoryTabs();
+                  if (isAdminLoggedIn && !isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
+                    syncAdminChangesToCloud(true).catch(e => console.warn("[CloudSync] Auto-sync cat move error:", e));
+                  }
                 });
               } catch(lockErr) {
                 console.error("[Storage] Lỗi Web Lock khi di chuyển danh mục:", lockErr);
@@ -9366,6 +10719,9 @@
                   renderCategoryTabs();
                   renderItems();
                   showToast("Đã xóa danh mục an toàn!");
+                  if (isAdminLoggedIn && !isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
+                    syncAdminChangesToCloud(true).catch(e => console.warn("[CloudSync] Auto-sync cat del error:", e));
+                  }
                 });
               } catch(lockErr) {
                 console.error("[Storage] Lỗi Web Lock khi xóa danh mục:", lockErr);
@@ -9392,6 +10748,9 @@
               renderCategoryTabs();
               updateCategoryDropdowns();
               showToast(`Đã thêm danh mục "${name}"`);
+              if (isAdminLoggedIn && !isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
+                syncAdminChangesToCloud(true).catch(e => console.warn("[CloudSync] Auto-sync cat add error:", e));
+              }
             });
           } catch(lockErr) {
             console.error("[Storage] Lỗi Web Lock khi thêm danh mục:", lockErr);
@@ -9411,6 +10770,9 @@
                 renderCategoryTabs();
                 updateCategoryDropdowns();
                 showToast("Đã khôi phục danh mục mặc định!");
+                if (isAdminLoggedIn && !isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
+                  syncAdminChangesToCloud(true).catch(e => console.warn("[CloudSync] Auto-sync cat reset error:", e));
+                }
               });
             } catch(lockErr) {
               console.error("[Storage] Lỗi Web Lock khi khôi phục danh mục:", lockErr);
@@ -9599,7 +10961,6 @@
         });
       }
 
-      const isFileProtocol = window.location.protocol === "file:";
       if ("serviceWorker" in navigator && !isFileProtocol) {
         // Chỉ reload khi người dùng đã chủ động bấm chấp thuận cập nhật (updateApproved === true)
         navigator.serviceWorker.addEventListener("controllerchange", () => {
@@ -10775,6 +12136,224 @@
       }
 
       // ==========================================================================
+      // 20.4. CLOUD SYNC ENGINE (ĐỒNG BỘ THỜI GIAN THỰC TOÀN TRƯỜNG QUA FIREBASE RTDB)
+      // ==========================================================================
+      const CLOUD_SYNC_ENDPOINT = "https://cva-smartguardian-default-rtdb.asia-southeast1.firebasedatabase.app/teacher_portal";
+      let isCloudSyncing = false;
+
+      /**
+       * Đẩy toàn bộ cấu hình hệ thống (links & categories) lên Firebase RTDB
+       * Dành cho Quản trị viên (Admin)
+       */
+      async function syncAdminChangesToCloud(silent = false) {
+        if (!isAdminLoggedIn) {
+          if (!silent) showToast("🔐 Vui lòng đăng nhập Admin để phát hành dữ liệu lên Đám mây!", "error");
+          return { success: false, error: "Unauthorized" };
+        }
+        if (isFileProtocol || (typeof navigator !== "undefined" && !navigator.onLine)) {
+          if (!silent) showToast("⚠️ Chế độ ngoại tuyến, không thể kết nối máy chủ đám mây.", "warning");
+          return { success: false, error: "Offline" };
+        }
+        if (isCloudSyncing) return { success: false, error: "SyncInProgress" };
+
+        isCloudSyncing = true;
+        try {
+          const now = Date.now();
+          const cleanCats = categoriesData.map(c => ({
+            id: c.id,
+            label: c.label,
+            icon: c.icon,
+            ...(c.system ? { system: true } : {})
+          }));
+          const cleanLinks = linksData.map(l => ({
+            id: l.id,
+            title: l.title,
+            url: l.url,
+            category: l.category,
+            color: l.color,
+            iconChar: l.iconChar,
+            isFavorite: Boolean(l.isFavorite)
+          }));
+
+          const cloudPayload = {
+            version: CURRENT_DATA_VERSION,
+            updatedAt: now,
+            updatedBy: "Admin",
+            categories: cleanCats,
+            links: cleanLinks
+          };
+
+          const resConfig = await fetch(`${CLOUD_SYNC_ENDPOINT}/system_config.json`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(cloudPayload)
+          });
+          if (!resConfig.ok) {
+            throw new Error(`Firebase PUT system_config error: HTTP ${resConfig.status}`);
+          }
+
+          const resVer = await fetch(`${CLOUD_SYNC_ENDPOINT}/version.json`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              version: CURRENT_DATA_VERSION,
+              updatedAt: now
+            })
+          });
+          if (!resVer.ok) {
+            throw new Error(`Firebase PUT version error: HTTP ${resVer.status}`);
+          }
+
+          safeStorageSet("teacher_hub_cloud_synced_at", String(now));
+          console.log("[CloudSync] Đã đẩy dữ liệu hệ thống lên đám mây thành công lúc", new Date(now).toLocaleTimeString());
+          if (!silent) {
+            showToast("☁️ Đã phát hành dữ liệu lên đám mây toàn trường thành công!");
+          }
+          return { success: true, updatedAt: now };
+        } catch(err) {
+          console.error("[CloudSync] Lỗi đẩy dữ liệu lên đám mây:", err);
+          if (!silent) {
+            showToast(`❌ Lỗi đồng bộ đám mây: ${err.message}`, "error");
+          }
+          return { success: false, error: err.message };
+        } finally {
+          isCloudSyncing = false;
+        }
+      }
+
+      /**
+       * Kiểm tra và kéo dữ liệu mới nhất từ Cloud về máy client
+       * Áp dụng Smart Merge: Cập nhật link hệ thống, bảo toàn 100% link cá nhân và yêu thích
+       */
+      async function checkCloudSystemUpdates(isManual = false) {
+        if (isFileProtocol || (typeof navigator !== "undefined" && !navigator.onLine)) {
+          if (isManual) showToast("⚠️ Chế độ ngoại tuyến, không thể kiểm tra cập nhật đám mây.", "warning");
+          return { success: false, error: "Offline" };
+        }
+        if (isCloudSyncing) return { success: false, error: "SyncInProgress" };
+
+        try {
+          if (isManual) showToast("🔄 Đang kiểm tra dữ liệu mới từ máy chủ trường...", "info");
+
+          const verRes = await fetch(`${CLOUD_SYNC_ENDPOINT}/version.json?t=${Date.now()}`, {
+            method: "GET",
+            headers: { "Accept": "application/json" },
+            cache: "no-store"
+          });
+          if (!verRes.ok) {
+            if (isManual) showToast("ℹ️ Chưa có bản cập nhật đám mây trên máy chủ.", "info");
+            return { success: false, error: "NoCloudData" };
+          }
+          const cloudVerData = await verRes.json();
+          if (!cloudVerData || !cloudVerData.updatedAt) {
+            if (isManual) showToast("ℹ️ Dữ liệu trên máy chủ trường đã ở bản mới nhất.", "info");
+            return { success: true, updated: false };
+          }
+
+          const localSyncAt = Number(localStorage.getItem("teacher_hub_cloud_synced_at") || 0);
+          if (!isManual && cloudVerData.updatedAt <= localSyncAt) {
+            return { success: true, updated: false };
+          }
+
+          const configRes = await fetch(`${CLOUD_SYNC_ENDPOINT}/system_config.json?t=${Date.now()}`, {
+            method: "GET",
+            headers: { "Accept": "application/json" },
+            cache: "no-store"
+          });
+          if (!configRes.ok) {
+            throw new Error(`HTTP ${configRes.status} khi tải system_config`);
+          }
+          const cloudConfig = await configRes.json();
+          if (!cloudConfig || !Array.isArray(cloudConfig.links)) {
+            if (isManual) showToast("ℹ️ Dữ liệu đám mây không đúng định dạng.", "warning");
+            return { success: false, error: "InvalidCloudPayload" };
+          }
+
+          let mergeResult = null;
+          await executeWithCrossTabLock(async (lockCtx) => {
+            const rawCloudLinks = cloudConfig.links || [];
+            const rawCloudCats = cloudConfig.categories || [];
+
+            const validCloudCats = rawCloudCats.filter(c => c && typeof c === "object" && typeof c.id === "string" && typeof c.label === "string");
+            const validCloudLinks = rawCloudLinks.filter(l => l && typeof l === "object" && typeof l.id === "string" && typeof l.title === "string" && typeof l.url === "string" && /^https?:\/\//i.test(l.url.trim()));
+
+            let updatedCount = 0;
+            let addedCount = 0;
+
+            const catMap = new Map(categoriesData.map(c => [c.id, c]));
+            validCloudCats.forEach(cCat => {
+              if (catMap.has(cCat.id)) {
+                const exist = catMap.get(cCat.id);
+                if (exist.label !== cCat.label || exist.icon !== cCat.icon) {
+                  exist.label = cCat.label;
+                  exist.icon = cCat.icon;
+                }
+              } else {
+                categoriesData.push({ ...cCat });
+                catMap.set(cCat.id, cCat);
+              }
+            });
+
+            const cloudLinksMap = new Map(validCloudLinks.map(l => [l.id, l]));
+            const localLinkIds = new Set(linksData.map(l => l.id));
+
+            linksData.forEach((locLink, idx) => {
+              if (cloudLinksMap.has(locLink.id)) {
+                const cLink = cloudLinksMap.get(locLink.id);
+                const hasChanged = locLink.url !== cLink.url ||
+                                   locLink.title !== cLink.title ||
+                                   locLink.desc !== cLink.desc ||
+                                   locLink.category !== cLink.category ||
+                                   locLink.color !== cLink.color ||
+                                   locLink.iconChar !== cLink.iconChar;
+                if (hasChanged) {
+                  linksData[idx] = {
+                    ...locLink,
+                    url: cLink.url,
+                    title: cLink.title,
+                    desc: cLink.desc || locLink.desc,
+                    category: cLink.category,
+                    color: cLink.color || locLink.color,
+                    iconChar: cLink.iconChar || locLink.iconChar
+                  };
+                  updatedCount++;
+                }
+              }
+            });
+
+            validCloudLinks.forEach(cLink => {
+              if (!localLinkIds.has(cLink.id)) {
+                linksData.push({ ...cLink });
+                localLinkIds.add(cLink.id);
+                addedCount++;
+              }
+            });
+
+            await updateUnifiedStoreUnlocked(lockCtx);
+            safeStorageSet("teacher_hub_cloud_synced_at", String(cloudVerData.updatedAt));
+
+            mergeResult = { success: true, updated: true, addedCount, updatedCount };
+          });
+
+          renderCategoryTabs();
+          renderItems();
+
+          if (mergeResult && (mergeResult.addedCount > 0 || mergeResult.updatedCount > 0)) {
+            showToast(`☁️ Đã đồng bộ từ trường: Cập nhật ${mergeResult.updatedCount} và thêm ${mergeResult.addedCount} liên kết mới!`);
+          } else if (isManual) {
+            showToast("✅ Danh sách website đã đồng bộ hoàn toàn với dữ liệu mới nhất của trường!");
+          }
+          return mergeResult || { success: true, updated: false };
+        } catch(err) {
+          console.warn("[CloudSync] Lỗi khi kiểm tra cập nhật đám mây:", err);
+          if (isManual) {
+            showToast(`⚠️ Không thể tải dữ liệu đám mây: ${err.message}`, "warning");
+          }
+          return { success: false, error: err.message };
+        }
+      }
+
+      // ==========================================================================
       // 21. EXPORT TO GLOBAL WINDOW OBJECT & KHỞI CHẠY HỆ THỐNG
       // ==========================================================================
       window.teacherPortal = {
@@ -10791,9 +12370,13 @@
         delItem,
         copyText,
         verifyAdminPin,
-        showToast
+        showToast,
+        syncAdminChangesToCloud,
+        checkCloudSystemUpdates
       };
 
+      window.syncAdminChangesToCloud = syncAdminChangesToCloud;
+      window.checkCloudSystemUpdates = checkCloudSystemUpdates;
       window.performAtomicSystemMigration = performAtomicSystemMigration;
       window.performAtomicSystemRestore = performAtomicSystemRestore;
       window.executeWithCrossTabLock = executeWithCrossTabLock;
@@ -10804,6 +12387,14 @@
       window.saveVaultStorageUnlocked = saveVaultStorageUnlocked;
       window.saveVaultStorage = saveVaultStorage;
       window.reconcileProjectionsFromManifest = reconcileProjectionsFromManifest;
+      window.computeRawSha256 = computeRawSha256;
+      window.computeTxChecksum = computeTxChecksum;
+      window.safeStorageRemove = safeStorageRemove;
+      window.validateStoredAuthState = validateStoredAuthState;
+      window.checkRateLimit = checkRateLimit;
+      window.checkRateLimitUnlocked = checkRateLimitUnlocked;
+      window.recordAuthFailure = recordAuthFailure;
+      window.resetAuthFailures = resetAuthFailures;
 
       // KHỞI CHẠY BAN ĐẦU
       async function initializeApp() {
@@ -10872,9 +12463,26 @@
         } else {
           applyTheme("light");
         }
+
+        // Tự động kiểm tra cập nhật đám mây toàn trường khi trực tuyến (không chặn luồng nạp chính)
+        if (!isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
+          setTimeout(() => {
+            checkCloudSystemUpdates(false).catch(err => {
+              console.warn("[CloudSync] Kiểm tra cập nhật nền gặp lỗi:", err);
+            });
+          }, 1500);
+        }
       }
 
       if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+        window.addEventListener("online", () => {
+          if (!isFileProtocol) {
+            checkCloudSystemUpdates(false).catch(err => {
+              console.warn("[CloudSync] Kiểm tra khi kết nối lại mạng gặp lỗi:", err);
+            });
+          }
+        });
+
         window.addEventListener("storage", (e) => {
           if (e.key === "teacher_hub_store_v2" || e.key === "teacher_hub_data_version") {
             syncMemoryFromLatestStorage();

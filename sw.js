@@ -1,9 +1,9 @@
 /* ==========================================================================
    SERVICE WORKER: CỔNG WEBSITE GIÁO VIÊN (PWA OFFLINE-FIRST & AUTO-UPDATE)
-   Phiên bản: 2.1.0
+   Phiên bản: 2.2.0
    ========================================================================== */
 
-const CACHE_NAME = 'teacher-hub-v2.1.0';
+const CACHE_NAME = 'teacher-hub-v2.2.0';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -16,6 +16,7 @@ const ASSETS_TO_CACHE = [
 
 // 1. CÀI ĐẶT (INSTALL): Caching bền bỉ (Resilient caching - không để 1 file lỗi chặn toàn bộ)
 self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then(async cache => {
       const cachePromises = ASSETS_TO_CACHE.map(async asset => {

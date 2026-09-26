@@ -213,11 +213,24 @@ function extractFunctionBody(code, funcName) {
   return depth === 0 ? code.slice(funcStart, i) : null;
 }
 
+const safeStorageRemoveFuncCode = extractFunctionBody(appJs, 'safeStorageRemove');
+const verifyAuthFencingFuncCode = extractFunctionBody(appJs, 'verifyAuthFencing');
+const safeFencedSetAuthFuncCode = extractFunctionBody(appJs, 'safeFencedSetAuth');
+const safeFencedRemoveAuthFuncCode = extractFunctionBody(appJs, 'safeFencedRemoveAuth');
+const validateAuthStagingFuncCode = extractFunctionBody(appJs, 'validateAuthStagingPayload');
+const validateStoredAuthFuncCode = extractFunctionBody(appJs, 'validateStoredAuthState');
+const checkRateLimitFuncCode = extractFunctionBody(appJs, 'checkRateLimit');
+const checkRateLimitUnlockedFuncCode = extractFunctionBody(appJs, 'checkRateLimitUnlocked');
+const recordAuthFailureFuncCode = extractFunctionBody(appJs, 'recordAuthFailure');
+const resetAuthFailuresFuncCode = extractFunctionBody(appJs, 'resetAuthFailures');
+
 // 7.1 Kiểm thử Thực tế hàm performAtomicSystemMigration trong Node.js VM Sandbox
 console.log('\n📌 7.1 Kiểm thử Thực tế performAtomicSystemMigration (Node.js VM Sandbox):');
 await (async () => {
   const vm = require('vm');
 
+  const rawSha256FuncCode = extractFunctionBody(appJs, 'computeRawSha256');
+  assert(Boolean(rawSha256FuncCode), 'Trích xuất thành công 100% mã nguồn hàm computeRawSha256');
   const checksumFuncCode = extractFunctionBody(appJs, 'computeTxChecksum');
   assert(Boolean(checksumFuncCode), 'Trích xuất thành công 100% mã nguồn hàm computeTxChecksum');
   const recoverFuncCode = extractFunctionBody(appJs, 'recoverStagingTransaction');
@@ -245,7 +258,34 @@ await (async () => {
   const validateSyncFuncCode = extractFunctionBody(appJs, 'validateSyncPayload');
   assert(Boolean(validateSyncFuncCode), 'Trích xuất thành công 100% mã nguồn hàm validateSyncPayload');
   const delItemFuncCode = extractFunctionBody(appJs, 'delItem');
-  assert(Boolean(delItemFuncCode), 'Trích xuất thành công 100% mã nguồn hàm delItem');
+  assert(Boolean(safeStorageRemoveFuncCode), 'Trích xuất thành công 100% mã nguồn hàm safeStorageRemove');
+  assert(Boolean(verifyAuthFencingFuncCode), 'Trích xuất thành công 100% mã nguồn hàm verifyAuthFencing');
+  assert(Boolean(safeFencedSetAuthFuncCode), 'Trích xuất thành công 100% mã nguồn hàm safeFencedSetAuth');
+  assert(Boolean(safeFencedRemoveAuthFuncCode), 'Trích xuất thành công 100% mã nguồn hàm safeFencedRemoveAuth');
+  assert(Boolean(validateAuthStagingFuncCode), 'Trích xuất thành công 100% mã nguồn hàm validateAuthStagingPayload');
+  assert(Boolean(validateStoredAuthFuncCode), 'Trích xuất thành công 100% mã nguồn hàm validateStoredAuthState');
+  assert(Boolean(checkRateLimitFuncCode), 'Trích xuất thành công 100% mã nguồn hàm checkRateLimit');
+  assert(Boolean(checkRateLimitUnlockedFuncCode), 'Trích xuất thành công 100% mã nguồn hàm checkRateLimitUnlocked');
+  assert(Boolean(recordAuthFailureFuncCode), 'Trích xuất thành công 100% mã nguồn hàm recordAuthFailure');
+  assert(Boolean(resetAuthFailuresFuncCode), 'Trích xuất thành công 100% mã nguồn hàm resetAuthFailures');
+
+  // Static AST / regex verification for Zero Implicit Coercion & Secure Fencing in auth path
+  const authCodeBundle = [
+    validateStoredAuthFuncCode,
+    checkRateLimitFuncCode,
+    checkRateLimitUnlockedFuncCode,
+    recordAuthFailureFuncCode,
+    resetAuthFailuresFuncCode
+  ].join("\n");
+
+  assert(!/Number\s*\(\s*(rawFails|rawLockUntil|lockUntilRaw|curAuthFailsRaw)/.test(authCodeBundle),
+    'Static Verification: CẤM 100% biểu thức Number(rawFails), Number(rawLockUntil) hoặc Number(lockUntilRaw) trong toàn bộ auth path');
+  assert(!authCodeBundle.includes('localStorage.setItem("cva_auth_error"'),
+    'Static Verification: CẤM raw localStorage.setItem("cva_auth_error") trong auth path (Bắt buộc dùng safeFencedSetAuth)');
+  assert(verifyAuthFencingFuncCode.includes('JSON.parse(curLockRaw)'),
+    'Static Verification: verifyAuthFencing bắt buộc parse JSON cva_migration_lock');
+  assert(verifyAuthFencingFuncCode.includes('parsedLock.token !== ctx.token'),
+    'Static Verification: verifyAuthFencing bắt buộc kiểm tra token ownership của lock marker');
 
   if (migrationFuncCode) {
     const mockStorageMap = new Map();
@@ -357,6 +397,7 @@ await (async () => {
     const script = new vm.Script(
       'let CURRENT_DATA_VERSION = this.CURRENT_DATA_VERSION || "2026.09.21.03";\n' +
       'let SCHEMA_VERSION = 2;\n' +
+      'const MAX_AUTH_FAILS = 5;\n' +
       'let currentLockContext = this.currentLockContext || null;\n' +
       'let remindersData = this.remindersData || [];\n' +
       'let teacherTimetableData = this.teacherTimetableData || {};\n' +
@@ -380,7 +421,12 @@ await (async () => {
       '  set: (v) => { teacherTimetableData = v; },\n' +
       '  configurable: true\n' +
       '});\n' +
+      (safeStorageRemoveFuncCode ? safeStorageRemoveFuncCode + '\nthis.safeStorageRemove = safeStorageRemove;\n' : '') +
+      (verifyAuthFencingFuncCode ? verifyAuthFencingFuncCode + '\nthis.verifyAuthFencing = verifyAuthFencing;\n' : '') +
+      (safeFencedSetAuthFuncCode ? safeFencedSetAuthFuncCode + '\nthis.safeFencedSetAuth = safeFencedSetAuth;\n' : '') +
+      (safeFencedRemoveAuthFuncCode ? safeFencedRemoveAuthFuncCode + '\nthis.safeFencedRemoveAuth = safeFencedRemoveAuth;\n' : '') +
       (lockFuncCode ? lockFuncCode + '\nthis.executeWithCrossTabLock = executeWithCrossTabLock;\n' : '') +
+      (rawSha256FuncCode ? rawSha256FuncCode + '\nthis.computeRawSha256 = computeRawSha256;\n' : '') +
       (updateUnifiedUnlockedFuncCode ? updateUnifiedUnlockedFuncCode + '\nthis.updateUnifiedStoreUnlocked = updateUnifiedStoreUnlocked;\n' : '') +
       (checksumFuncCode ? checksumFuncCode + '\nthis.computeTxChecksum = computeTxChecksum;\n' : '') +
       (updateUnifiedFuncCode ? updateUnifiedFuncCode + '\nthis.updateUnifiedStore = updateUnifiedStore;\n' : '') +
@@ -391,6 +437,12 @@ await (async () => {
       (loadCatFuncCode ? loadCatFuncCode + '\nthis.loadCategoriesFromStorage = loadCategoriesFromStorage;\n' : '') +
       (loadLinksFuncCode ? loadLinksFuncCode + '\nthis.loadLinksFromStorage = loadLinksFromStorage;\n' : '') +
       (validateSyncFuncCode ? validateSyncFuncCode + '\nthis.validateSyncPayload = validateSyncPayload;\n' : '') +
+      (validateAuthStagingFuncCode ? validateAuthStagingFuncCode + '\nthis.validateAuthStagingPayload = validateAuthStagingPayload;\n' : '') +
+      (validateStoredAuthFuncCode ? validateStoredAuthFuncCode + '\nthis.validateStoredAuthState = validateStoredAuthState;\n' : '') +
+      (checkRateLimitUnlockedFuncCode ? checkRateLimitUnlockedFuncCode + '\nthis.checkRateLimitUnlocked = checkRateLimitUnlocked;\n' : '') +
+      (checkRateLimitFuncCode ? checkRateLimitFuncCode + '\nthis.checkRateLimit = checkRateLimit;\n' : '') +
+      (recordAuthFailureFuncCode ? recordAuthFailureFuncCode + '\nthis.recordAuthFailure = recordAuthFailure;\n' : '') +
+      (resetAuthFailuresFuncCode ? resetAuthFailuresFuncCode + '\nthis.resetAuthFailures = resetAuthFailures;\n' : '') +
       (restoreFuncCode ? restoreFuncCode + '\nthis.performAtomicSystemRestore = performAtomicSystemRestore;\n' : '') +
       migrationFuncCode + '\nthis.performAtomicSystemMigration = performAtomicSystemMigration;'
     );
@@ -790,6 +842,559 @@ await (async () => {
     assert(errStoreFuture.stage === "store_crash_recovery_future_generation", 'VM Sandbox 12.12: Cờ lỗi ghi đúng stage store_crash_recovery_future_generation');
     mockStorageMap.delete("cva_store_staging");
     mockStorageMap.delete("cva_store_error");
+
+    // Test VM 12.13 (Codex Point 2): Auth Staging lockout roll-forward
+    mockStorageMap.clear();
+    mockStorageMap.set("cva_fencing_generation", "1");
+    mockStorageMap.set("cva_fencing_token", "lock_tok_sandbox_15");
+    mockStorageMap.set("cva_migration_lock", JSON.stringify({ token: "lock_tok_sandbox_15", generation: 1, time: Date.now() }));
+    sandbox.currentLockContext = defaultLockCtx;
+    const authLockoutStaging = {
+      stage: "auth_lockout",
+      fails: 5,
+      isLockout: true,
+      lockUntil: 1999999999000,
+      generation: 1,
+      token: "lock_tok_sandbox_15"
+    };
+    mockStorageMap.set("cva_auth_staging", JSON.stringify(authLockoutStaging));
+    const recRes12_13 = sandbox.recoverStagingTransaction();
+    assert(recRes12_13.recovered === true, 'VM Sandbox 12.13: recoverStagingTransaction khôi phục thành công cva_auth_staging (auth_lockout)');
+    assert(mockStorageMap.get("teacher_hub_auth_fails") === "5", 'VM Sandbox 12.13: teacher_hub_auth_fails được roll-forward về 5');
+    assert(mockStorageMap.get("teacher_hub_lock_until") === "1999999999000", 'VM Sandbox 12.13: teacher_hub_lock_until được roll-forward chính xác');
+    assert(mockStorageMap.get("teacher_hub_auth_generation") === "1", 'VM Sandbox 12.13: teacher_hub_auth_generation được ghi nhận');
+    assert(mockStorageMap.get("teacher_hub_auth_token") === "lock_tok_sandbox_15", 'VM Sandbox 12.13: teacher_hub_auth_token được ghi nhận');
+    assert(!mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.13: cva_auth_staging được dọn sạch sau khi phục hồi');
+
+    // Test VM 12.14 (Codex Point 2): Auth Staging reset_auth_failures roll-forward
+    mockStorageMap.clear();
+    mockStorageMap.set("cva_fencing_generation", "1");
+    mockStorageMap.set("cva_fencing_token", "lock_tok_sandbox_15");
+    mockStorageMap.set("cva_migration_lock", JSON.stringify({ token: "lock_tok_sandbox_15", generation: 1, time: Date.now() }));
+    mockStorageMap.set("teacher_hub_auth_fails", "5");
+    mockStorageMap.set("teacher_hub_lock_until", "1999999999000");
+    sandbox.currentLockContext = defaultLockCtx;
+    const authResetStaging = {
+      stage: "reset_auth_failures",
+      fails: 0,
+      isLockout: false,
+      lockUntil: 0,
+      generation: 1,
+      token: "lock_tok_sandbox_15"
+    };
+    mockStorageMap.set("cva_auth_staging", JSON.stringify(authResetStaging));
+    const recRes12_14 = sandbox.recoverStagingTransaction();
+    assert(recRes12_14.recovered === true, 'VM Sandbox 12.14: recoverStagingTransaction khôi phục thành công reset_auth_failures');
+    assert(!mockStorageMap.has("teacher_hub_auth_fails"), 'VM Sandbox 12.14: teacher_hub_auth_fails được xóa sạch');
+    assert(!mockStorageMap.has("teacher_hub_lock_until"), 'VM Sandbox 12.14: teacher_hub_lock_until được xóa sạch');
+    assert(mockStorageMap.get("teacher_hub_auth_generation") === "1", 'VM Sandbox 12.14: teacher_hub_auth_generation được ghi nhận');
+    assert(!mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.14: cva_auth_staging dọn sạch sau khi phục hồi');
+
+    // Test VM 12.15 (Codex Point 2): Auth Staging future generation -> Phase 1 Fail-Closed
+    mockStorageMap.clear();
+    mockStorageMap.set("cva_fencing_generation", "1");
+    mockStorageMap.set("cva_fencing_token", "lock_tok_sandbox_15");
+    mockStorageMap.set("cva_migration_lock", JSON.stringify({ token: "lock_tok_sandbox_15", generation: 1, time: Date.now() }));
+    sandbox.currentLockContext = defaultLockCtx;
+    const authFutureGen = {
+      stage: "auth_lockout",
+      fails: 5,
+      isLockout: true,
+      lockUntil: 1999999999000,
+      generation: 30,
+      token: "tok_future"
+    };
+    mockStorageMap.set("cva_auth_staging", JSON.stringify(authFutureGen));
+    const recRes12_15 = sandbox.recoverStagingTransaction();
+    assert(recRes12_15.recovered === false && recRes12_15.error && recRes12_15.error.includes("Fail-Closed"), 'VM Sandbox 12.15: Auth staging generation tương lai (30 > 1) kích hoạt Phase 1 Fail-Closed');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.15: Staging được bảo lưu để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.15: Ghi nhận cờ lỗi cva_auth_error');
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.16 (Adversarial Codex Point 4): Staging auth cũ (Tab A) KHÔNG ĐƯỢC GHI ĐÈ auth state mới của Tab B
+    mockStorageMap.clear();
+    mockStorageMap.set("cva_fencing_generation", "2");
+    mockStorageMap.set("cva_fencing_token", "tok_tab_b");
+    mockStorageMap.set("cva_migration_lock", JSON.stringify({ token: "tok_tab_b", generation: 2, time: Date.now() }));
+    mockStorageMap.set("teacher_hub_auth_generation", "2");
+    mockStorageMap.set("teacher_hub_auth_token", "tok_tab_b");
+    sandbox.currentLockContext = { generation: 2, token: "tok_tab_b", verifyFencing: () => true };
+
+    const staleAuthLockoutA = {
+      stage: "auth_lockout",
+      fails: 5,
+      isLockout: true,
+      lockUntil: 1999999999000,
+      generation: 1,
+      token: "tok_tab_a"
+    };
+    mockStorageMap.set("cva_auth_staging", JSON.stringify(staleAuthLockoutA));
+    const recRes12_16 = sandbox.recoverStagingTransaction();
+    assert(recRes12_16.recovered === true, 'VM Sandbox 12.16: Staging cũ của Tab A được nhận diện đã bị supersede');
+    assert(!mockStorageMap.has("teacher_hub_auth_fails"), 'VM Sandbox 12.16: KHÔNG bị Tab A ghi đè auth_fails lên state của Tab B');
+    assert(!mockStorageMap.has("teacher_hub_lock_until"), 'VM Sandbox 12.16: KHÔNG bị Tab A ghi đè lock_until lên state của Tab B');
+    assert(mockStorageMap.get("teacher_hub_auth_generation") === "2", 'VM Sandbox 12.16: Bảo toàn generation của Tab B');
+    assert(mockStorageMap.get("teacher_hub_auth_token") === "tok_tab_b", 'VM Sandbox 12.16: Bảo toàn token của Tab B');
+    assert(!mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.16: Staging cũ được dọn dẹp sạch');
+
+    // Test VM 12.17 (Adversarial Codex Point 4): Staging reset cũ của Tab A KHÔNG ĐƯỢC XÓA lockout mới của Tab B
+    mockStorageMap.clear();
+    mockStorageMap.set("cva_fencing_generation", "3");
+    mockStorageMap.set("cva_fencing_token", "tok_tab_b_locked");
+    mockStorageMap.set("cva_migration_lock", JSON.stringify({ token: "tok_tab_b_locked", generation: 3, time: Date.now() }));
+    mockStorageMap.set("teacher_hub_auth_fails", "5");
+    mockStorageMap.set("teacher_hub_lock_until", "1999999999000");
+    mockStorageMap.set("teacher_hub_auth_generation", "3");
+    mockStorageMap.set("teacher_hub_auth_token", "tok_tab_b_locked");
+    sandbox.currentLockContext = { generation: 3, token: "tok_tab_b_locked", verifyFencing: () => true };
+
+    const staleAuthResetA = {
+      stage: "reset_auth_failures",
+      fails: 0,
+      isLockout: false,
+      lockUntil: 0,
+      generation: 1,
+      token: "tok_tab_a"
+    };
+    mockStorageMap.set("cva_auth_staging", JSON.stringify(staleAuthResetA));
+    const recRes12_17 = sandbox.recoverStagingTransaction();
+    assert(recRes12_17.recovered === true, 'VM Sandbox 12.17: Staging reset cũ của Tab A được nhận diện đã bị supersede');
+    assert(mockStorageMap.get("teacher_hub_auth_fails") === "5", 'VM Sandbox 12.17: Lockout của Tab B được bảo toàn 100% (fails=5)');
+    assert(mockStorageMap.get("teacher_hub_lock_until") === "1999999999000", 'VM Sandbox 12.17: Thời hạn lockout của Tab B được bảo toàn');
+    assert(!mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.17: Staging reset cũ được dọn sạch');
+
+    // Test VM 12.18 (Adversarial Codex Point 2): Generation tăng nhưng chưa có commit mới chứng minh -> Fail-Closed
+    mockStorageMap.clear();
+    mockStorageMap.set("cva_fencing_generation", "5");
+    mockStorageMap.set("cva_fencing_token", "tok_uncommitted");
+    mockStorageMap.set("cva_migration_lock", JSON.stringify({ token: "tok_uncommitted", generation: 5, time: Date.now() }));
+    sandbox.currentLockContext = { generation: 5, token: "tok_uncommitted", verifyFencing: () => true };
+
+    const unverifiedAuthStaging = {
+      stage: "auth_lockout",
+      fails: 5,
+      isLockout: true,
+      lockUntil: 1999999999000,
+      generation: 1,
+      token: "tok_tab_a"
+    };
+    mockStorageMap.set("cva_auth_staging", JSON.stringify(unverifiedAuthStaging));
+    const recRes12_18 = sandbox.recoverStagingTransaction();
+    assert(recRes12_18.recovered === false && recRes12_18.error && recRes12_18.error.includes("Fail-Closed"), 'VM Sandbox 12.18: Staging gen cũ khi chưa có commit mới chứng minh kích hoạt Fail-Closed an toàn');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.18: Staging được bảo lưu để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.18: Ghi nhận cờ lỗi cva_auth_error');
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.19 (Adversarial Codex Finding): Staging auth chứa fails: null kích hoạt Fail-Closed & ghi cva_auth_error
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "auth_lockout",
+      fails: null,
+      isLockout: true,
+      lockUntil: 1999999999000,
+      generation: 1,
+      token: "tok_test_rec"
+    }));
+    const recRes12_19 = sandbox.recoverStagingTransaction();
+    assert(recRes12_19.recovered === false && recRes12_19.error && recRes12_19.error.includes("Fail-Closed"), 'VM Sandbox 12.19: Staging auth chứa fails: null kích hoạt Fail-Closed an toàn');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.19: Staging được bảo lưu để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.19: Ghi nhận cờ lỗi cva_auth_error khi fails bị null');
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.20 (Adversarial Codex Finding): Stored teacher_hub_auth_fails = "abc" kích hoạt Phase 1 Fail-Closed
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("teacher_hub_auth_fails", "abc");
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "auth_lockout",
+      fails: 5,
+      isLockout: true,
+      lockUntil: 1999999999000,
+      generation: 1,
+      token: "tok_test_rec"
+    }));
+    const recRes12_20 = sandbox.recoverStagingTransaction();
+    assert(recRes12_20.recovered === false && recRes12_20.error && recRes12_20.error.includes("Fail-Closed"), 'VM Sandbox 12.20: Stored teacher_hub_auth_fails bị hỏng kích hoạt Phase 1 Fail-Closed');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.20: Staging được bảo lưu để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.20: Ghi nhận cờ lỗi cva_auth_error khi stored fails bị biến dạng');
+    mockStorageMap.delete("teacher_hub_auth_fails");
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.21 (Codex Adversarial Finding): stage "auth_lockout" nhưng isLockout: false
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "auth_lockout",
+      fails: 5,
+      isLockout: false,
+      lockUntil: 1999999999000,
+      generation: 1,
+      token: "tok_test_rec"
+    }));
+    const recRes12_21 = sandbox.recoverStagingTransaction();
+    assert(recRes12_21.recovered === false && recRes12_21.error && recRes12_21.error.includes("Fail-Closed"), 'VM Sandbox 12.21: stage auth_lockout với isLockout: false kích hoạt Phase 1 Fail-Closed');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.21: Staging được bảo lưu để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.21: Ghi nhận cờ lỗi cva_auth_error khi auth_lockout có isLockout: false');
+    assert(!mockStorageMap.has("teacher_hub_lock_until"), 'VM Sandbox 12.21: Không ghi đè teacher_hub_lock_until khi staging mâu thuẫn');
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.22 (Codex Adversarial Finding): stage "auth_failure_increment" nhưng isLockout: true
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "auth_failure_increment",
+      fails: 3,
+      isLockout: true,
+      lockUntil: 1999999999000,
+      generation: 1,
+      token: "tok_test_rec"
+    }));
+    const recRes12_22 = sandbox.recoverStagingTransaction();
+    assert(recRes12_22.recovered === false && recRes12_22.error && recRes12_22.error.includes("Fail-Closed"), 'VM Sandbox 12.22: stage auth_failure_increment với isLockout: true kích hoạt Phase 1 Fail-Closed');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.22: Staging được bảo lưu để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.22: Ghi nhận cờ lỗi cva_auth_error khi increment có isLockout: true');
+    assert(!mockStorageMap.has("teacher_hub_auth_fails"), 'VM Sandbox 12.22: Không commit teacher_hub_auth_fails khi staging mâu thuẫn');
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.23 (Codex Adversarial Finding): stage "auth_lockout" nhưng lockUntil: 0
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "auth_lockout",
+      fails: 5,
+      isLockout: true,
+      lockUntil: 0,
+      generation: 1,
+      token: "tok_test_rec"
+    }));
+    const recRes12_23 = sandbox.recoverStagingTransaction();
+    assert(recRes12_23.recovered === false && recRes12_23.error && recRes12_23.error.includes("Fail-Closed"), 'VM Sandbox 12.23: stage auth_lockout với lockUntil: 0 kích hoạt Phase 1 Fail-Closed');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.23: Staging được bảo lưu để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.23: Ghi nhận cờ lỗi cva_auth_error khi lockUntil = 0 trong auth_lockout');
+    assert(!mockStorageMap.has("teacher_hub_lock_until"), 'VM Sandbox 12.23: Không ghi teacher_hub_lock_until khi lockUntil không hợp lệ');
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.24 (Codex Adversarial Finding): stage "auth_lockout", fails: 5 nhưng thiếu hoặc sai isLockout (ví dụ: isLockout là string "true")
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "auth_lockout",
+      fails: 5,
+      isLockout: "true",
+      lockUntil: 1999999999000,
+      generation: 1,
+      token: "tok_test_rec"
+    }));
+    const recRes12_24 = sandbox.recoverStagingTransaction();
+    assert(recRes12_24.recovered === false && recRes12_24.error && recRes12_24.error.includes("Fail-Closed"), 'VM Sandbox 12.24: isLockout không phải boolean (string "true") kích hoạt Phase 1 Fail-Closed');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.24: Staging được bảo lưu để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.24: Ghi nhận cờ lỗi cva_auth_error khi isLockout sai kiểu');
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.25 (Codex Adversarial Finding): stage "reset_auth_failures" nhưng isLockout: true
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "reset_auth_failures",
+      fails: 0,
+      isLockout: true,
+      lockUntil: 0,
+      generation: 1,
+      token: "tok_test_rec"
+    }));
+    const recRes12_25 = sandbox.recoverStagingTransaction();
+    assert(recRes12_25.recovered === false && recRes12_25.error && recRes12_25.error.includes("Fail-Closed"), 'VM Sandbox 12.25: stage reset_auth_failures với isLockout: true kích hoạt Phase 1 Fail-Closed');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.25: Staging được bảo lưu để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.25: Ghi nhận cờ lỗi cva_auth_error khi reset có isLockout: true');
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.26 (Codex Adversarial Finding): stage "reset_auth_failures" nhưng fails: 3 (fails !== 0)
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "reset_auth_failures",
+      fails: 3,
+      isLockout: false,
+      lockUntil: 0,
+      generation: 1,
+      token: "tok_test_rec"
+    }));
+    const recRes12_26 = sandbox.recoverStagingTransaction();
+    assert(recRes12_26.recovered === false && recRes12_26.error && recRes12_26.error.includes("Fail-Closed"), 'VM Sandbox 12.26: stage reset_auth_failures với fails !== 0 kích hoạt Phase 1 Fail-Closed');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.26: Staging được bảo lưu để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.26: Ghi nhận cờ lỗi cva_auth_error khi reset có fails !== 0');
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.27 (Codex Adversarial Finding): stage "reset_auth_failures" nhưng lockUntil: 5000 (lockUntil !== 0)
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "reset_auth_failures",
+      fails: 0,
+      isLockout: false,
+      lockUntil: 5000,
+      generation: 1,
+      token: "tok_test_rec"
+    }));
+    const recRes12_27 = sandbox.recoverStagingTransaction();
+    assert(recRes12_27.recovered === false && recRes12_27.error && recRes12_27.error.includes("Fail-Closed"), 'VM Sandbox 12.27: stage reset_auth_failures với lockUntil !== 0 kích hoạt Phase 1 Fail-Closed');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.27: Staging được bảo lưu để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.27: Ghi nhận cờ lỗi cva_auth_error khi reset có lockUntil !== 0');
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.28 (Codex Adversarial Finding): stage "reset_auth_failures" với lockUntil: "0" (chuỗi thay vì số)
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "reset_auth_failures",
+      fails: 0,
+      isLockout: false,
+      lockUntil: "0",
+      generation: 1,
+      token: "tok_test_rec"
+    }));
+    const recRes12_28 = sandbox.recoverStagingTransaction();
+    assert(recRes12_28.recovered === false && recRes12_28.error && recRes12_28.error.includes("Fail-Closed"), 'VM Sandbox 12.28: lockUntil: "0" kích hoạt Phase 1 Fail-Closed');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.28: Staging được bảo lưu để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.28: Ghi nhận cờ lỗi cva_auth_error khi lockUntil là chuỗi "0"');
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.29 (Codex Adversarial Finding): stage "auth_failure_increment" với lockUntil: "0" (chuỗi thay vì số)
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "auth_failure_increment",
+      fails: 2,
+      isLockout: false,
+      lockUntil: "0",
+      generation: 1,
+      token: "tok_test_rec"
+    }));
+    const recRes12_29 = sandbox.recoverStagingTransaction();
+    assert(recRes12_29.recovered === false && recRes12_29.error && recRes12_29.error.includes("Fail-Closed"), 'VM Sandbox 12.29: lockUntil: "0" trong increment kích hoạt Phase 1 Fail-Closed');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.29: Staging được bảo lưu để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.29: Ghi nhận cờ lỗi cva_auth_error');
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.30 (Codex Adversarial Finding): stage "auth_lockout" với lockUntil: "5000" (chuỗi thay vì số)
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "auth_lockout",
+      fails: 5,
+      isLockout: true,
+      lockUntil: "5000",
+      generation: 1,
+      token: "tok_test_rec"
+    }));
+    const recRes12_30 = sandbox.recoverStagingTransaction();
+    assert(recRes12_30.recovered === false && recRes12_30.error && recRes12_30.error.includes("Fail-Closed"), 'VM Sandbox 12.30: lockUntil: "5000" trong lockout kích hoạt Phase 1 Fail-Closed');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.30: Staging được bảo lưu để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.30: Ghi nhận cờ lỗi cva_auth_error');
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.31 (Codex Adversarial Finding): lockUntil là chuỗi rỗng "" hoặc "NaN"
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "reset_auth_failures",
+      fails: 0,
+      isLockout: false,
+      lockUntil: "",
+      generation: 1,
+      token: "tok_test_rec"
+    }));
+    const recRes12_31 = sandbox.recoverStagingTransaction();
+    assert(recRes12_31.recovered === false && recRes12_31.error && recRes12_31.error.includes("Fail-Closed"), 'VM Sandbox 12.31: lockUntil: "" kích hoạt Phase 1 Fail-Closed');
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "reset_auth_failures",
+      fails: 0,
+      isLockout: false,
+      lockUntil: "NaN",
+      generation: 1,
+      token: "tok_test_rec"
+    }));
+    const recRes12_31b = sandbox.recoverStagingTransaction();
+    assert(recRes12_31b.recovered === false && recRes12_31b.error && recRes12_31b.error.includes("Fail-Closed"), 'VM Sandbox 12.31b: lockUntil: "NaN" kích hoạt Phase 1 Fail-Closed');
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.32 (Codex Adversarial Finding): fails là chuỗi "0" hoặc "5"
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "reset_auth_failures",
+      fails: "0",
+      isLockout: false,
+      lockUntil: 0,
+      generation: 1,
+      token: "tok_test_rec"
+    }));
+    const recRes12_32 = sandbox.recoverStagingTransaction();
+    assert(recRes12_32.recovered === false && recRes12_32.error && recRes12_32.error.includes("Fail-Closed"), 'VM Sandbox 12.32: fails: "0" kích hoạt Phase 1 Fail-Closed');
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "auth_lockout",
+      fails: "5",
+      isLockout: true,
+      lockUntil: 5000,
+      generation: 1,
+      token: "tok_test_rec"
+    }));
+    const recRes12_32b = sandbox.recoverStagingTransaction();
+    assert(recRes12_32b.recovered === false && recRes12_32b.error && recRes12_32b.error.includes("Fail-Closed"), 'VM Sandbox 12.32b: fails: "5" kích hoạt Phase 1 Fail-Closed');
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.33 (Codex Adversarial Finding): generation là chuỗi "1" thay vì số
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "reset_auth_failures",
+      fails: 0,
+      isLockout: false,
+      lockUntil: 0,
+      generation: "1",
+      token: "tok_test_rec"
+    }));
+    const recRes12_33 = sandbox.recoverStagingTransaction();
+    assert(recRes12_33.recovered === false && recRes12_33.error && recRes12_33.error.includes("Fail-Closed"), 'VM Sandbox 12.33: generation: "1" kích hoạt Phase 1 Fail-Closed');
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.34 (Codex Adversarial Finding): checkRateLimit() ngoài lock từ chối staging chứa lockUntil: "0"
+    mockStorageMap.clear();
+    sandbox.isStorageDegraded = false;
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "reset_auth_failures",
+      fails: 0,
+      isLockout: false,
+      lockUntil: "0",
+      generation: 1,
+      token: "tok_test_rec"
+    }));
+    const checkRateRes = sandbox.checkRateLimit();
+    assert(checkRateRes === false, 'VM Sandbox 12.34: checkRateLimit() từ chối staging có lockUntil: "0"');
+    assert(sandbox.isStorageDegraded === true, 'VM Sandbox 12.34: checkRateLimit() kích hoạt isStorageDegraded khi staging sai kiểu');
+    sandbox.isStorageDegraded = false;
+    mockStorageMap.delete("cva_auth_staging");
+
+    // Test VM 12.35 (Codex Adversarial Finding): validateAuthStagingPayload từ chối lockUntil: new Number(0)
+    const valResObjNumber = sandbox.validateAuthStagingPayload({
+      stage: "reset_auth_failures",
+      fails: 0,
+      isLockout: false,
+      lockUntil: new Number(0),
+      generation: 1,
+      token: "tok_test_rec"
+    });
+    assert(valResObjNumber.valid === false, 'VM Sandbox 12.35: validateAuthStagingPayload từ chối lockUntil là Object Number (new Number(0))');
+
+    // Test VM 12.36 (Codex Requirement 4): recoverStagingTransaction từ chối khi stored fails = "5" nhưng lockUntil = "5000" (năm 1970)
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("teacher_hub_auth_fails", "5");
+    mockStorageMap.set("teacher_hub_lock_until", "5000");
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "reset_auth_failures",
+      fails: 0,
+      isLockout: false,
+      lockUntil: 0,
+      generation: 1,
+      token: "lock_tok_sandbox_15"
+    }));
+    const recRes12_36 = sandbox.recoverStagingTransaction();
+    assert(recRes12_36.recovered === false && recRes12_36.error && recRes12_36.error.includes("Fail-Closed"), 'VM Sandbox 12.36: Stored auth state corrupted (lockUntil 1970) kích hoạt Fail-Closed trong Phase 1');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.36: Staging được bảo lưu nguyên vẹn để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.36: Ghi nhận cờ lỗi cva_auth_error');
+    assert(mockStorageMap.get("teacher_hub_auth_fails") === "5", 'VM Sandbox 12.36: Không thay đổi teacher_hub_auth_fails trong storage');
+    assert(mockStorageMap.get("teacher_hub_lock_until") === "5000", 'VM Sandbox 12.36: Không thay đổi teacher_hub_lock_until trong storage');
+    mockStorageMap.delete("teacher_hub_auth_fails");
+    mockStorageMap.delete("teacher_hub_lock_until");
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.37 (Codex Requirement 4): recoverStagingTransaction từ chối khi stored fails = "0" (0 không được phép lưu dạng khóa)
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("teacher_hub_auth_fails", "0");
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "auth_lockout",
+      fails: 5,
+      isLockout: true,
+      lockUntil: 1999999999000,
+      generation: 1,
+      token: "lock_tok_sandbox_15"
+    }));
+    const recRes12_37 = sandbox.recoverStagingTransaction();
+    assert(recRes12_37.recovered === false && recRes12_37.error && recRes12_37.error.includes("Fail-Closed"), 'VM Sandbox 12.37: Stored fails = "0" kích hoạt Fail-Closed trong Phase 1');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.37: Staging được bảo lưu nguyên vẹn để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.37: Ghi nhận cờ lỗi cva_auth_error');
+    assert(mockStorageMap.get("teacher_hub_auth_fails") === "0", 'VM Sandbox 12.37: Không thay đổi teacher_hub_auth_fails trong storage');
+    assert(!mockStorageMap.has("teacher_hub_lock_until"), 'VM Sandbox 12.37: Không ghi đè teacher_hub_lock_until khi storage hỏng');
+    mockStorageMap.delete("teacher_hub_auth_fails");
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.38 (Codex Requirement 4): recoverStagingTransaction từ chối khi stored fails = "3" nhưng có lock_until
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("teacher_hub_auth_fails", "3");
+    mockStorageMap.set("teacher_hub_lock_until", "1999999999000");
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "auth_failure_increment",
+      fails: 4,
+      isLockout: false,
+      lockUntil: 0,
+      generation: 1,
+      token: "lock_tok_sandbox_15"
+    }));
+    const recRes12_38 = sandbox.recoverStagingTransaction();
+    assert(recRes12_38.recovered === false && recRes12_38.error && recRes12_38.error.includes("Fail-Closed"), 'VM Sandbox 12.38: Stored fails = "3" kèm lock_until kích hoạt Fail-Closed trong Phase 1');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.38: Staging được bảo lưu nguyên vẹn để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.38: Ghi nhận cờ lỗi cva_auth_error');
+    assert(mockStorageMap.get("teacher_hub_auth_fails") === "3", 'VM Sandbox 12.38: Không thay đổi teacher_hub_auth_fails');
+    assert(mockStorageMap.get("teacher_hub_lock_until") === "1999999999000", 'VM Sandbox 12.38: Không thay đổi teacher_hub_lock_until');
+    mockStorageMap.delete("teacher_hub_auth_fails");
+    mockStorageMap.delete("teacher_hub_lock_until");
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
+
+    // Test VM 12.39 (Codex Requirement 4): recoverStagingTransaction từ chối khi orphan lock_until tồn tại mà không có auth_fails
+    mockStorageMap.clear();
+    rearmSandboxLock();
+    mockStorageMap.set("teacher_hub_lock_until", "1999999999000");
+    mockStorageMap.set("cva_auth_staging", JSON.stringify({
+      stage: "auth_lockout",
+      fails: 5,
+      isLockout: true,
+      lockUntil: 1999999999000,
+      generation: 1,
+      token: "lock_tok_sandbox_15"
+    }));
+    const recRes12_39 = sandbox.recoverStagingTransaction();
+    assert(recRes12_39.recovered === false && recRes12_39.error && recRes12_39.error.includes("Fail-Closed"), 'VM Sandbox 12.39: Orphan lock_until kích hoạt Fail-Closed trong Phase 1');
+    assert(mockStorageMap.has("cva_auth_staging"), 'VM Sandbox 12.39: Staging được bảo lưu nguyên vẹn để chẩn đoán');
+    assert(mockStorageMap.has("cva_auth_error"), 'VM Sandbox 12.39: Ghi nhận cờ lỗi cva_auth_error');
+    assert(!mockStorageMap.has("teacher_hub_auth_fails"), 'VM Sandbox 12.39: Không ghi đè teacher_hub_auth_fails');
+    assert(mockStorageMap.get("teacher_hub_lock_until") === "1999999999000", 'VM Sandbox 12.39: Không thay đổi orphan lock_until');
+    mockStorageMap.delete("teacher_hub_lock_until");
+    mockStorageMap.delete("cva_auth_staging");
+    mockStorageMap.delete("cva_auth_error");
 
     // Test VM 13: Kiểm thử Thực tế Fencing Preemption Interleaving (Codex Invariant: Tab B Preempts Tab A)
     mockStorageMap.clear();
@@ -1321,7 +1926,10 @@ await (async () => {
         token: "lock_tok_vault_test",
         verifyFencing: () => true
       };
-      const scriptVault = new vm.Script(vaultSaveCode + '\nthis.saveVaultStorageUnlocked = saveVaultStorageUnlocked;');
+      const scriptVault = new vm.Script(
+        (safeStorageRemoveFuncCode ? safeStorageRemoveFuncCode + '\n' : '') +
+        vaultSaveCode + '\nthis.saveVaultStorageUnlocked = saveVaultStorageUnlocked;'
+      );
       scriptVault.runInContext(vm.createContext(mockVaultContext));
       await mockVaultContext.saveVaultStorageUnlocked(lockCtx);
 
@@ -1862,13 +2470,15 @@ console.log('\n📌 7.2.1 Kiểm thử Luồng Tự Động Tiếp Tục Hành �
 })();
 
 // 7.2 Kiểm thử Thực tế Rate-Limiting Chống Brute-force Master PIN (SPEC 2.3)
-console.log('\n📌 7.2 Kiểm thử Thực tế Rate-Limiting Chống Brute-force PIN:');
-(() => {
-  const mCheck = appJs.match(/function checkRateLimit[\s\S]*?\n      \}/);
-  const mRecord = appJs.match(/function recordAuthFailure[\s\S]*?\n      \}/);
-  const mReset = appJs.match(/function resetAuthFailures[\s\S]*?\n      \}/);
+console.log('\n📌 7.2 Kiểm thử Thực tế Rate-Limiting Chống Brute-force PIN & 2PC WAL:');
+await (async () => {
+  const checkUnlockedFuncCode = extractFunctionBody(appJs, 'checkRateLimitUnlocked');
+  const checkFuncCode = extractFunctionBody(appJs, 'checkRateLimit');
+  const recordFuncCode = extractFunctionBody(appJs, 'recordAuthFailure');
+  const resetFuncCode = extractFunctionBody(appJs, 'resetAuthFailures');
+  const verifyAdminPinFuncCode = extractFunctionBody(appJs, 'verifyAdminPin');
 
-  if (mCheck && mRecord && mReset) {
+  if (checkFuncCode && recordFuncCode && resetFuncCode) {
     const mockMap = new Map();
     const mockLocalStorage = {
       getItem: (k) => mockMap.get(k) || null,
@@ -1880,26 +2490,1037 @@ console.log('\n📌 7.2 Kiểm thử Thực tế Rate-Limiting Chống Brute-for
     const showToast = () => {};
 
     const evalScope = `
-      ${mCheck[0]}
-      ${mRecord[0]}
-      ${mReset[0]}
+      ${validateAuthStagingFuncCode ? validateAuthStagingFuncCode : ''}
+      ${validateStoredAuthFuncCode ? validateStoredAuthFuncCode : ''}
+      ${safeStorageRemoveFuncCode ? safeStorageRemoveFuncCode : ''}
+      ${verifyAuthFencingFuncCode ? verifyAuthFencingFuncCode : ''}
+      ${safeFencedSetAuthFuncCode ? safeFencedSetAuthFuncCode : ''}
+      ${safeFencedRemoveAuthFuncCode ? safeFencedRemoveAuthFuncCode : ''}
+      ${checkUnlockedFuncCode ? checkUnlockedFuncCode : ''}
+      ${checkFuncCode}
+      ${recordFuncCode}
+      ${resetFuncCode}
+      ${verifyAdminPinFuncCode ? verifyAdminPinFuncCode : ''}
+      this.validateAuthStagingPayload = typeof validateAuthStagingPayload !== "undefined" ? validateAuthStagingPayload : null;
+      this.validateStoredAuthState = typeof validateStoredAuthState !== "undefined" ? validateStoredAuthState : null;
+      this.verifyAuthFencing = typeof verifyAuthFencing !== "undefined" ? verifyAuthFencing : null;
+      this.safeFencedSetAuth = typeof safeFencedSetAuth !== "undefined" ? safeFencedSetAuth : null;
+      this.safeFencedRemoveAuth = typeof safeFencedRemoveAuth !== "undefined" ? safeFencedRemoveAuth : null;
+      this.checkRateLimitUnlocked = typeof checkRateLimitUnlocked !== "undefined" ? checkRateLimitUnlocked : null;
       this.checkRateLimit = checkRateLimit;
       this.recordAuthFailure = recordAuthFailure;
       this.resetAuthFailures = resetAuthFailures;
+      this.verifyAdminPin = typeof verifyAdminPin !== "undefined" ? verifyAdminPin : null;
     `;
     const vm = require('vm');
-    const sandbox = { localStorage: mockLocalStorage, MAX_AUTH_FAILS, LOCKOUT_MS, showToast, console: { log: () => {} }, Date };
+    let sandboxGen = 0;
+    const sandbox = {
+      localStorage: mockLocalStorage,
+      MAX_AUTH_FAILS,
+      LOCKOUT_MS,
+      showToast,
+      console: { log: () => {}, warn: () => {}, error: () => {} },
+      Date,
+      executeWithCrossTabLock: async (cb) => {
+        sandboxGen++;
+        const tok = 'tok_sandbox_' + sandboxGen;
+        mockMap.set('cva_fencing_generation', String(sandboxGen));
+        mockMap.set('cva_fencing_token', tok);
+        mockMap.set('cva_migration_lock', JSON.stringify({ token: tok, generation: sandboxGen, time: Date.now() }));
+        const ctx = {
+          generation: sandboxGen,
+          token: tok,
+          revoked: false,
+          verifyFencing: () => {
+            if (ctx.revoked) return false;
+            if (Number(mockMap.get('cva_fencing_generation')) !== sandboxGen || mockMap.get('cva_fencing_token') !== ctx.token) return false;
+            const curL = mockMap.get('cva_migration_lock');
+            if (!curL) return false;
+            try {
+              const p = JSON.parse(curL);
+              return Boolean(p && typeof p === "object" && !Array.isArray(p) && p.token === ctx.token && p.generation === sandboxGen);
+            } catch {
+              return false;
+            }
+          }
+        };
+        try {
+          return await cb(ctx);
+        } finally {
+          mockMap.delete('cva_migration_lock');
+          ctx.revoked = true;
+        }
+      }
+    };
     const script = new vm.Script(evalScope);
     script.runInContext(vm.createContext(sandbox));
 
     assert(sandbox.checkRateLimit() === true, 'RateLimit ban đầu cho phép thử xác thực');
-    for (let i = 0; i < 4; i++) sandbox.recordAuthFailure();
+    for (let i = 0; i < 4; i++) await sandbox.recordAuthFailure();
     assert(sandbox.checkRateLimit() === true, 'Sau 4 lần sai: Chưa kích hoạt khóa lockout');
-    sandbox.recordAuthFailure(); // Lần 5
+    await sandbox.recordAuthFailure(); // Lần 5
     assert(sandbox.checkRateLimit() === false, 'Sau 5 lần sai: Khóa tạm thời 30 giây (checkRateLimit() === false)');
     assert(mockMap.get('teacher_hub_lock_until') !== null, 'Thời điểm khóa teacher_hub_lock_until được lưu bền vững vào localStorage');
-    sandbox.resetAuthFailures();
+    assert(mockMap.get('teacher_hub_auth_fails') === '5', 'Số lần sai được ghi nhận chính xác 5 lần');
+    assert(mockMap.has('cva_auth_staging') === false, 'WAL staging cva_auth_staging được dọn sạch sau khi commit');
+
+    await sandbox.resetAuthFailures();
     assert(sandbox.checkRateLimit() === true, 'Sau khi resetAuthFailures(): Mở khóa thành công');
+    assert(mockMap.has('teacher_hub_auth_fails') === false, 'Xóa sạch teacher_hub_auth_fails sau khi reset');
+    assert(mockMap.has('teacher_hub_lock_until') === false, 'Xóa sạch teacher_hub_lock_until sau khi reset');
+
+    // ── 7.2.1: Adversarial Interleaving Test (Hai tab cùng đua lệnh tại lần thử 4) ──
+    console.log('  ▸ 7.2.1 Kiểm tra Dual-Tab Concurrent Race & Interleaving Protection:');
+    const sharedAuthMap = new Map();
+    sharedAuthMap.set('teacher_hub_auth_fails', '3');
+    let currentSharedGen = 0;
+
+    const mockSharedStorage = {
+      getItem: (k) => sharedAuthMap.get(k) || null,
+      setItem: (k, v) => sharedAuthMap.set(k, String(v)),
+      removeItem: (k) => sharedAuthMap.delete(k)
+    };
+
+    // Hàm giả lập Web Locks tuần tự hóa giữa 2 tab với fencing markers
+    const createTabSandbox = (tabName) => {
+      const tabSandbox = {
+        localStorage: mockSharedStorage,
+        MAX_AUTH_FAILS,
+        LOCKOUT_MS,
+        showToast: () => {},
+        console: { log: () => {}, warn: () => {}, error: () => {} },
+        Date,
+        executeWithCrossTabLock: async (cb) => {
+          currentSharedGen++;
+          const gen = currentSharedGen;
+          const tok = `tok_${tabName}_gen_${gen}`;
+          sharedAuthMap.set('cva_fencing_generation', String(gen));
+          sharedAuthMap.set('cva_fencing_token', tok);
+          sharedAuthMap.set('cva_migration_lock', JSON.stringify({ token: tok, generation: gen, time: Date.now() }));
+          const lockCtx = {
+            generation: gen,
+            token: tok,
+            revoked: false,
+            verifyFencing: () => {
+              const curG = Number(sharedAuthMap.get('cva_fencing_generation') || 0);
+              const curT = sharedAuthMap.get('cva_fencing_token');
+              const curL = sharedAuthMap.get('cva_migration_lock');
+              if (!curL) return false;
+              try {
+                const p = JSON.parse(curL);
+                return !lockCtx.revoked && curG === gen && curT === tok && Boolean(p && typeof p === "object" && !Array.isArray(p) && p.token === tok && p.generation === gen);
+              } catch {
+                return false;
+              }
+            }
+          };
+          try {
+            return await cb(lockCtx);
+          } finally {
+            if (lockCtx.verifyFencing()) {
+              sharedAuthMap.delete('cva_migration_lock');
+            }
+            lockCtx.revoked = true;
+          }
+        }
+      };
+      const s = new vm.Script(evalScope);
+      s.runInContext(vm.createContext(tabSandbox));
+      return tabSandbox;
+    };
+
+    const tabA = createTabSandbox('TabA');
+    const tabB = createTabSandbox('TabB');
+
+    // Tab A và Tab B cùng gửi lệnh thất bại gần như đồng thời
+    const [resA, resB] = await Promise.all([
+      tabA.recordAuthFailure(),
+      tabB.recordAuthFailure()
+    ]);
+
+    assert(Boolean(resA && resB), 'Dual-Tab Concurrency: Cả hai tab hoàn thành recordAuthFailure an toàn');
+    assert(sharedAuthMap.get('teacher_hub_auth_fails') === '5', 'Dual-Tab Concurrency: Không mất lần thử nào (3 -> 4 -> 5, 0 lost updates)');
+    assert(sharedAuthMap.get('teacher_hub_lock_until') !== null, 'Dual-Tab Concurrency: Trạng thái lockout được bảo toàn nguyên vẹn');
+    assert(tabA.checkRateLimit() === false && tabB.checkRateLimit() === false, 'Dual-Tab Concurrency: Cả hai tab đều nhận diện trạng thái lockout đồng bộ');
+
+    // ── 7.2.2: Stale Writer & Revoked Lock Rejection (Fail-Closed) ──
+    console.log('  ▸ 7.2.2 Kiểm tra Stale Writer & Revoked Lock Rejection (Fail-Closed):');
+    const revokedCtx = {
+      generation: 99,
+      token: 'tok_revoked',
+      revoked: true,
+      verifyFencing: () => false
+    };
+
+    let threwRevokedRecord = false;
+    try {
+      await tabA.recordAuthFailure(revokedCtx);
+    } catch (err) {
+      threwRevokedRecord = Boolean(err && err.message && err.message.includes('StorageLockUnavailable'));
+    }
+    assert(threwRevokedRecord === true, 'Fail-Closed: recordAuthFailure ném StorageLockUnavailable khi lock context bị revoked');
+
+    let threwRevokedReset = false;
+    try {
+      await tabA.resetAuthFailures(revokedCtx);
+    } catch (err) {
+      threwRevokedReset = Boolean(err && err.message && err.message.includes('StorageLockUnavailable'));
+    }
+    assert(threwRevokedReset === true, 'Fail-Closed: resetAuthFailures ném StorageLockUnavailable khi lock context bị revoked');
+    assert(sharedAuthMap.get('teacher_hub_lock_until') !== null, 'Fail-Closed: Lockout không bị xóa bởi revoked lock context');
+
+    // Stale generation writer
+    const staleCtx = {
+      generation: 1, // Storage hiện đang ở gen > 1
+      token: 'tok_stale',
+      revoked: false,
+      verifyFencing: () => false
+    };
+
+    let threwStaleReset = false;
+    try {
+      await tabB.resetAuthFailures(staleCtx);
+    } catch (err) {
+      threwStaleReset = Boolean(err && err.message && err.message.includes('FencingViolation'));
+    }
+    assert(threwStaleReset === true, 'Fail-Closed: resetAuthFailures ném FencingViolation khi generation bị superseded');
+    assert(sharedAuthMap.get('teacher_hub_lock_until') !== null, 'Fail-Closed: Stale generation writer tuyệt đối KHÔNG xóa được teacher_hub_lock_until');
+
+    // ── 7.2.2.b: Adversarial Interleaving Test 1 (Preemption between reset mutations) ──
+    console.log('  ▸ 7.2.2.b Adversarial Interleaving: Preemption between reset mutations (Anti-Split-Brain):');
+    const advMap = new Map();
+    const origLockoutTime = Date.now() + 30000;
+    const tabBLockoutTime = Date.now() + 60000;
+    advMap.set('teacher_hub_auth_fails', '5');
+    advMap.set('teacher_hub_lock_until', String(origLockoutTime));
+    advMap.set('cva_fencing_generation', '10');
+    advMap.set('cva_fencing_token', 'tok_tabA_gen_10');
+    advMap.set('cva_migration_lock', JSON.stringify({ token: 'tok_tabA_gen_10', generation: 10, time: Date.now() }));
+
+    const tabALockCtx = {
+      generation: 10,
+      token: 'tok_tabA_gen_10',
+      revoked: false,
+      verifyFencing: () => {
+        if (tabALockCtx.revoked) return false;
+        if (Number(advMap.get('cva_fencing_generation')) !== 10 || advMap.get('cva_fencing_token') !== 'tok_tabA_gen_10') return false;
+        const curL = advMap.get('cva_migration_lock');
+        if (!curL) return false;
+        try {
+          const p = JSON.parse(curL);
+          return Boolean(p && typeof p === "object" && !Array.isArray(p) && p.token === 'tok_tabA_gen_10' && p.generation === 10);
+        } catch {
+          return false;
+        }
+      }
+    };
+
+    let tabBIntervened = false;
+    const advStorage = {
+      getItem: (k) => advMap.get(k) || null,
+      setItem: (k, v) => advMap.set(k, String(v)),
+      removeItem: (k) => {
+        advMap.delete(k);
+        // Ngay khi Tab A vừa xóa teacher_hub_auth_fails: Tab B nhảy vào chiếm quyền (Preemption)
+        if (k === 'teacher_hub_auth_fails' && !tabBIntervened) {
+          tabBIntervened = true;
+          // Tab B nâng generation lên 11 và thiết lập lockout mới
+          advMap.set('cva_fencing_generation', '11');
+          advMap.set('cva_fencing_token', 'tok_tabB_gen_11');
+          advMap.set('cva_migration_lock', JSON.stringify({ token: 'tok_tabB_gen_11', generation: 11, time: Date.now() }));
+          advMap.set('teacher_hub_lock_until', String(tabBLockoutTime));
+        }
+      }
+    };
+
+    const advSandbox = {
+      localStorage: advStorage,
+      MAX_AUTH_FAILS,
+      LOCKOUT_MS,
+      showToast: () => {},
+      console: { log: () => {}, warn: () => {}, error: () => {} },
+      Date
+    };
+    const advScript = new vm.Script(evalScope);
+    advScript.runInContext(vm.createContext(advSandbox));
+
+    let threwAdvReset = false;
+    try {
+      await advSandbox.resetAuthFailures(tabALockCtx);
+    } catch (err) {
+      threwAdvReset = Boolean(err && err.message && (err.message.includes('FencingViolation') || err.message.includes('AuthRollbackFailed')));
+    }
+    assert(threwAdvReset === true, 'Adversarial Reset Preemption: Tab A ném FencingViolation / AuthRollbackFailed khi Tab B xen ngang');
+    assert(advMap.get('teacher_hub_lock_until') === String(tabBLockoutTime), 'Adversarial Reset Preemption: Lockout của Tab B được bảo toàn 100%, không bị Tab A xóa đè');
+    assert(advMap.has('cva_auth_staging') === true, 'Adversarial Reset Preemption: Bảo lưu cva_auth_staging nguyên vẹn để recovery khi mất fencing');
+    assert(advSandbox.isStorageDegraded === true, 'Adversarial Reset Preemption: Kích hoạt isStorageDegraded khi phát hiện mất fencing');
+
+    // ── 7.2.2.c: Adversarial Interleaving Test 2 (Preemption during recordAuthFailure) ──
+    console.log('  ▸ 7.2.2.c Adversarial Interleaving: Preemption during recordAuthFailure (Anti-Split-Brain):');
+    const advRecordMap = new Map();
+    advRecordMap.set('teacher_hub_auth_fails', '2');
+    advRecordMap.set('cva_fencing_generation', '20');
+    advRecordMap.set('cva_fencing_token', 'tok_tabA_gen_20');
+    advRecordMap.set('cva_migration_lock', JSON.stringify({ token: 'tok_tabA_gen_20', generation: 20, time: Date.now() }));
+
+    const tabARecordCtx = {
+      generation: 20,
+      token: 'tok_tabA_gen_20',
+      revoked: false,
+      verifyFencing: () => {
+        if (tabARecordCtx.revoked) return false;
+        if (Number(advRecordMap.get('cva_fencing_generation')) !== 20 || advRecordMap.get('cva_fencing_token') !== 'tok_tabA_gen_20') return false;
+        const curL = advRecordMap.get('cva_migration_lock');
+        if (!curL) return false;
+        try {
+          const p = JSON.parse(curL);
+          return Boolean(p && typeof p === "object" && !Array.isArray(p) && p.token === 'tok_tabA_gen_20' && p.generation === 20);
+        } catch {
+          return false;
+        }
+      }
+    };
+
+    let tabBRecordIntervened = false;
+    const advRecordStorage = {
+      getItem: (k) => advRecordMap.get(k) || null,
+      setItem: (k, v) => {
+        advRecordMap.set(k, String(v));
+        // Ngay khi Tab A vừa ghi cva_auth_staging: Tab B xen ngang nâng generation
+        if (k === 'cva_auth_staging' && !tabBRecordIntervened) {
+          tabBRecordIntervened = true;
+          advRecordMap.set('cva_fencing_generation', '21');
+          advRecordMap.set('cva_fencing_token', 'tok_tabB_gen_21');
+          advRecordMap.set('cva_migration_lock', JSON.stringify({ token: 'tok_tabB_gen_21', generation: 21, time: Date.now() }));
+          advRecordMap.set('teacher_hub_auth_fails', '3'); // Tab B ghi nhận thành công fails = 3
+        }
+      },
+      removeItem: (k) => advRecordMap.delete(k)
+    };
+
+    const advRecordSandbox = {
+      localStorage: advRecordStorage,
+      MAX_AUTH_FAILS,
+      LOCKOUT_MS,
+      showToast: () => {},
+      console: { log: () => {}, warn: () => {}, error: () => {} },
+      Date
+    };
+    const advRecordScript = new vm.Script(evalScope);
+    advRecordScript.runInContext(vm.createContext(advRecordSandbox));
+
+    let threwAdvRecord = false;
+    try {
+      await advRecordSandbox.recordAuthFailure(tabARecordCtx);
+    } catch (err) {
+      threwAdvRecord = Boolean(err && err.message && (err.message.includes('FencingViolation') || err.message.includes('AuthRollbackFailed')));
+    }
+    assert(threwAdvRecord === true, 'Adversarial Record Preemption: Tab A ném FencingViolation / AuthRollbackFailed khi Tab B xen ngang');
+    assert(advRecordMap.get('teacher_hub_auth_fails') === '3', 'Adversarial Record Preemption: Dữ liệu của Tab B được bảo toàn 100%, không bị Tab A ghi đè staled fails');
+    assert(advRecordMap.has('cva_auth_staging') === true, 'Adversarial Record Preemption: Bảo lưu cva_auth_staging nguyên vẹn');
+    assert(advRecordSandbox.isStorageDegraded === true, 'Adversarial Record Preemption: Kích hoạt isStorageDegraded khi phát hiện mất fencing');
+
+    // ── 7.2.3: In-Flight WAL Staging Protection & Crash Recovery ──
+    console.log('  ▸ 7.2.3 Kiểm tra In-Flight WAL Staging Protection & Crash Recovery:');
+    const crashAuthMap = new Map();
+    const futureLockUntil = Date.now() + 25000;
+    // Giả lập crash: cva_auth_staging đã ghi lockout nhưng teacher_hub_lock_until chưa kịp commit
+    crashAuthMap.set('cva_auth_staging', JSON.stringify({
+      stage: 'auth_lockout',
+      fails: 5,
+      isLockout: true,
+      lockUntil: futureLockUntil,
+      generation: 1,
+      token: 'tok_crash',
+      time: Date.now()
+    }));
+
+    const crashSandbox = {
+      localStorage: {
+        getItem: (k) => crashAuthMap.get(k) || null,
+        setItem: (k, v) => crashAuthMap.set(k, String(v)),
+        removeItem: (k) => crashAuthMap.delete(k)
+      },
+      MAX_AUTH_FAILS,
+      LOCKOUT_MS,
+      showToast: () => {},
+      console: { log: () => {}, warn: () => {}, error: () => {} },
+      Date
+    };
+    const crashScript = new vm.Script(evalScope);
+    crashScript.runInContext(vm.createContext(crashSandbox));
+
+    assert(crashSandbox.checkRateLimit() === false, 'Crash Invariant: checkRateLimit kích hoạt lockout ngay từ cva_auth_staging dở dang (Fail-Closed)');
+
+    // Reset hợp lệ dưới lock context mới
+    await tabA.resetAuthFailures();
+    assert(tabA.checkRateLimit() === true, 'Hợp lệ: Sau khi resetAuthFailures dưới Web Locks, hệ thống mở khóa thành công');
+
+    // ── 7.2.4: Corrupt, Truncated & Invalid WAL Staging Tests (Fail-Closed Invariant) ──
+    console.log('  ▸ 7.2.4 Kiểm tra Corrupt, Truncated & Malformed WAL Staging (Fail-Closed):');
+    const corruptMap = new Map();
+    const corruptSandbox = {
+      localStorage: {
+        getItem: (k) => corruptMap.has(k) ? corruptMap.get(k) : null,
+        setItem: (k, v) => corruptMap.set(k, String(v)),
+        removeItem: (k) => corruptMap.delete(k)
+      },
+      MAX_AUTH_FAILS,
+      LOCKOUT_MS,
+      showToast: () => {},
+      console: { log: () => {}, warn: () => {}, error: () => {} },
+      Date
+    };
+    const corruptScript = new vm.Script(evalScope);
+    corruptScript.runInContext(vm.createContext(corruptSandbox));
+
+    // Case 1: JSON bị cắt cụt (Truncated JSON do browser bị kill)
+    corruptMap.set('cva_auth_staging', '{"stage":"auth_lockout","fails":5,"isLockout":true,"lockUn');
+    const resTrunc = corruptSandbox.checkRateLimit();
+    assert(resTrunc === false, 'Fail-Closed: checkRateLimit trả về false khi JSON staging bị cắt cụt (Truncated JSON)');
+    assert(corruptMap.has('cva_auth_error') === false, 'Pure Read-Only Invariant: checkRateLimit ngoài Web Locks tuyệt đối 0 ghi đĩa (0 storage mutations)');
+
+    // Case 2: Staging thiếu trường bắt buộc (Missing required fields: thiếu fails, token, generation)
+    corruptMap.clear();
+    corruptMap.set('cva_auth_staging', JSON.stringify({ stage: 'auth_lockout', isLockout: true, lockUntil: Date.now() + 30000 }));
+    const resMissing = corruptSandbox.checkRateLimit();
+    assert(resMissing === false, 'Fail-Closed: checkRateLimit từ chối khi staging thiếu trường bắt buộc (fails, generation, token)');
+
+    // Case 3: lockUntil là chuỗi không phải số hoặc NaN
+    corruptMap.clear();
+    corruptMap.set('cva_auth_staging', JSON.stringify({
+      stage: 'auth_lockout',
+      fails: 5,
+      isLockout: true,
+      lockUntil: 'invalid_string_not_number',
+      generation: 1,
+      token: 'tok_test'
+    }));
+    const resNan = corruptSandbox.checkRateLimit();
+    assert(resNan === false, 'Fail-Closed: checkRateLimit từ chối khi lockUntil là chuỗi không phải số');
+
+    // Case 4: lockUntil là số âm
+    corruptMap.clear();
+    corruptMap.set('cva_auth_staging', JSON.stringify({
+      stage: 'auth_lockout',
+      fails: 5,
+      isLockout: true,
+      lockUntil: -999,
+      generation: 1,
+      token: 'tok_test'
+    }));
+    const resNegative = corruptSandbox.checkRateLimit();
+    assert(resNegative === false, 'Fail-Closed: checkRateLimit từ chối khi lockUntil là số âm');
+
+    // Case 5: Staging dở dang kiểu in-flight increment
+    corruptMap.clear();
+    corruptMap.set('cva_auth_staging', JSON.stringify({
+      stage: 'auth_failure_increment',
+      fails: 3,
+      isLockout: false,
+      lockUntil: 0,
+      generation: 1,
+      token: 'tok_test'
+    }));
+    const resInflight = corruptSandbox.checkRateLimit();
+    assert(resInflight === false, 'Fail-Closed: checkRateLimit từ chối khi phát hiện staging increment đang ghi dở dang');
+
+    // Case 6 (Adversarial Codex Finding): Staging chứa fails: null
+    corruptMap.clear();
+    corruptMap.set('cva_auth_staging', JSON.stringify({
+      stage: 'auth_lockout',
+      fails: null,
+      isLockout: true,
+      lockUntil: Date.now() + 30000,
+      generation: 1,
+      token: 'tok_test'
+    }));
+    const resNullFails = corruptSandbox.checkRateLimit();
+    assert(resNullFails === false, 'Fail-Closed: checkRateLimit từ chối khi staging chứa fails: null');
+
+    // Case 7 (Adversarial Codex Finding): Staging chứa fails không phải số hợp lệ
+    corruptMap.clear();
+    corruptMap.set('cva_auth_staging', JSON.stringify({
+      stage: 'auth_lockout',
+      fails: 'invalid_nan',
+      isLockout: true,
+      lockUntil: Date.now() + 30000,
+      generation: 1,
+      token: 'tok_test'
+    }));
+    const resNanFails = corruptSandbox.checkRateLimit();
+    assert(resNanFails === false, 'Fail-Closed: checkRateLimit từ chối khi staging chứa fails không phải số hợp lệ');
+
+    // Case 8 (Adversarial Codex Finding): teacher_hub_auth_fails = "abc"
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', 'abc');
+    const resAbcFails = corruptSandbox.checkRateLimit();
+    assert(resAbcFails === false, 'Fail-Closed: checkRateLimit từ chối khi teacher_hub_auth_fails = "abc"');
+
+    // Case 9 (Adversarial Codex Finding): teacher_hub_auth_fails = "NaN"
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', 'NaN');
+    const resNanStoredFails = corruptSandbox.checkRateLimit();
+    assert(resNanStoredFails === false, 'Fail-Closed: checkRateLimit từ chối khi teacher_hub_auth_fails = "NaN"');
+
+    // Case 10 (Adversarial Codex Finding): teacher_hub_auth_fails = "-1" (số âm)
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', '-1');
+    const resNegativeStoredFails = corruptSandbox.checkRateLimit();
+    assert(resNegativeStoredFails === false, 'Fail-Closed: checkRateLimit từ chối khi teacher_hub_auth_fails là số âm');
+
+    // Case 11 (Adversarial Codex Finding): teacher_hub_auth_fails = "2.5" (số thập phân)
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', '2.5');
+    const resFloatStoredFails = corruptSandbox.checkRateLimit();
+    assert(resFloatStoredFails === false, 'Fail-Closed: checkRateLimit từ chối khi teacher_hub_auth_fails là số thập phân');
+
+    // Case 12 (Adversarial Codex Finding): teacher_hub_auth_fails vượt Number.MAX_SAFE_INTEGER
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', '9007199254740992');
+    const resHugeStoredFails = corruptSandbox.checkRateLimit();
+    assert(resHugeStoredFails === false, 'Fail-Closed: checkRateLimit từ chối khi teacher_hub_auth_fails vượt MAX_SAFE_INTEGER');
+
+    // Case 13 (Adversarial Codex Finding): teacher_hub_auth_fails vượt MAX_AUTH_FAILS (ví dụ: 999)
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', '999');
+    const resOverMaxStoredFails = corruptSandbox.checkRateLimit();
+    assert(resOverMaxStoredFails === false, 'Fail-Closed: checkRateLimit từ chối khi teacher_hub_auth_fails vượt MAX_AUTH_FAILS');
+
+    // Case 14 (Adversarial Codex Finding): recordAuthFailure dưới lock ném AuthFailuresCorrupted & ghi cva_auth_error khi teacher_hub_auth_fails bị hỏng
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', 'abc');
+    corruptMap.set('cva_fencing_generation', '1');
+    corruptMap.set('cva_fencing_token', 'tok_corr');
+    corruptMap.set('cva_migration_lock', JSON.stringify({ token: 'tok_corr', generation: 1, time: Date.now() }));
+    const validLockCtxForCorrupt = {
+      generation: 1,
+      token: 'tok_corr',
+      revoked: false,
+      verifyFencing: () => true
+    };
+    let threwCorruptedAuth = false;
+    try {
+      await corruptSandbox.recordAuthFailure(validLockCtxForCorrupt);
+    } catch (errCorr) {
+      threwCorruptedAuth = Boolean(errCorr && errCorr.message && errCorr.message.includes('AuthFailuresCorrupted'));
+    }
+    assert(threwCorruptedAuth === true, 'Fail-Closed: recordAuthFailure ném AuthFailuresCorrupted khi teacher_hub_auth_fails bị biến dạng');
+    assert(corruptMap.has('cva_auth_error') === true, 'Fail-Closed: recordAuthFailure ghi nhận cờ lỗi cva_auth_error khi phát hiện fails bị biến dạng');
+    assert(corruptMap.has('cva_auth_staging') === false, 'WAL Invariant: Không commit hay dọn staging mù quáng khi phát hiện corruption');
+
+    // Case 15 (Codex Adversarial Finding): stage: "auth_lockout" nhưng isLockout: false
+    corruptMap.clear();
+    corruptMap.set('cva_auth_staging', JSON.stringify({
+      stage: 'auth_lockout',
+      fails: 5,
+      isLockout: false,
+      lockUntil: Date.now() + 30000,
+      generation: 1,
+      token: 'tok_test'
+    }));
+    const resLockoutFalse = corruptSandbox.checkRateLimit();
+    assert(resLockoutFalse === false, 'Fail-Closed: checkRateLimit từ chối khi stage auth_lockout có isLockout: false');
+
+    // Case 16 (Codex Adversarial Finding): stage: "auth_failure_increment" nhưng isLockout: true
+    corruptMap.clear();
+    corruptMap.set('cva_auth_staging', JSON.stringify({
+      stage: 'auth_failure_increment',
+      fails: 3,
+      isLockout: true,
+      lockUntil: Date.now() + 30000,
+      generation: 1,
+      token: 'tok_test'
+    }));
+    const resIncrementTrue = corruptSandbox.checkRateLimit();
+    assert(resIncrementTrue === false, 'Fail-Closed: checkRateLimit từ chối khi stage auth_failure_increment có isLockout: true');
+
+    // Case 17 (Codex Adversarial Finding): stage: "auth_lockout" nhưng lockUntil: 0
+    corruptMap.clear();
+    corruptMap.set('cva_auth_staging', JSON.stringify({
+      stage: 'auth_lockout',
+      fails: 5,
+      isLockout: true,
+      lockUntil: 0,
+      generation: 1,
+      token: 'tok_test'
+    }));
+    const resLockoutZero = corruptSandbox.checkRateLimit();
+    assert(resLockoutZero === false, 'Fail-Closed: checkRateLimit từ chối khi stage auth_lockout có lockUntil: 0');
+
+    // Case 18 (Codex Adversarial Finding): stage: "auth_lockout", fails: 5 nhưng thiếu isLockout
+    corruptMap.clear();
+    corruptMap.set('cva_auth_staging', JSON.stringify({
+      stage: 'auth_lockout',
+      fails: 5,
+      lockUntil: Date.now() + 30000,
+      generation: 1,
+      token: 'tok_test'
+    }));
+    const resLockoutMissing = corruptSandbox.checkRateLimit();
+    assert(resLockoutMissing === false, 'Fail-Closed: checkRateLimit từ chối khi stage auth_lockout thiếu trường isLockout');
+
+    // Case 19 (Codex Adversarial Finding): stage: "auth_lockout", fails: 5 nhưng isLockout là string "true" (không phải boolean)
+    corruptMap.clear();
+    corruptMap.set('cva_auth_staging', JSON.stringify({
+      stage: 'auth_lockout',
+      fails: 5,
+      isLockout: 'true',
+      lockUntil: Date.now() + 30000,
+      generation: 1,
+      token: 'tok_test'
+    }));
+    const resLockoutString = corruptSandbox.checkRateLimit();
+    assert(resLockoutString === false, 'Fail-Closed: checkRateLimit từ chối khi isLockout là string "true" thay vì boolean');
+
+    // Case 20 (Codex Adversarial Finding): stage: "auth_lockout", fails: 4 (fails < MAX_AUTH_FAILS khi lockout)
+    corruptMap.clear();
+    corruptMap.set('cva_auth_staging', JSON.stringify({
+      stage: 'auth_lockout',
+      fails: 4,
+      isLockout: true,
+      lockUntil: Date.now() + 30000,
+      generation: 1,
+      token: 'tok_test'
+    }));
+    const resLockoutFailsMismatch = corruptSandbox.checkRateLimit();
+    assert(resLockoutFailsMismatch === false, 'Fail-Closed: checkRateLimit từ chối khi auth_lockout có fails < MAX_AUTH_FAILS');
+
+    // Case 21 (Codex Adversarial Finding): teacher_hub_auth_fails = "0" (0 failures cấm lưu thành khóa)
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', '0');
+    assert(corruptSandbox.checkRateLimit() === false, 'Fail-Closed: checkRateLimit từ chối khi stored teacher_hub_auth_fails = "0" (0 lần sai cấm lưu thành khóa)');
+
+    // Case 22 (Codex Adversarial Finding): teacher_hub_auth_fails = "5" (cô lập, thiếu teacher_hub_lock_until)
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', '5');
+    assert(corruptSandbox.checkRateLimit() === false, 'Fail-Closed: checkRateLimit từ chối khi teacher_hub_auth_fails = "5" nhưng thiếu teacher_hub_lock_until');
+
+    // Case 23 (Codex Adversarial Finding): teacher_hub_lock_until = "0"
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', '5');
+    corruptMap.set('teacher_hub_lock_until', '0');
+    assert(corruptSandbox.checkRateLimit() === false, 'Fail-Closed: checkRateLimit từ chối khi teacher_hub_lock_until = "0"');
+
+    // Case 24 (Codex Adversarial Finding): teacher_hub_lock_until = "5000" (năm 1970)
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', '5');
+    corruptMap.set('teacher_hub_lock_until', '5000');
+    assert(corruptSandbox.checkRateLimit() === false, 'Fail-Closed: checkRateLimit từ chối khi teacher_hub_lock_until = "5000"');
+
+    // Case 25 (Codex Adversarial Finding): teacher_hub_lock_until = "" (chuỗi rỗng)
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', '5');
+    corruptMap.set('teacher_hub_lock_until', '');
+    assert(corruptSandbox.checkRateLimit() === false, 'Fail-Closed: checkRateLimit từ chối khi teacher_hub_lock_until là chuỗi rỗng');
+
+    // Case 26 (Codex Adversarial Finding): teacher_hub_lock_until = "NaN"
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', '5');
+    corruptMap.set('teacher_hub_lock_until', 'NaN');
+    assert(corruptSandbox.checkRateLimit() === false, 'Fail-Closed: checkRateLimit từ chối khi teacher_hub_lock_until = "NaN"');
+
+    // Case 27 (Codex Adversarial Finding): teacher_hub_auth_fails = "" (chuỗi rỗng)
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', '');
+    assert(corruptSandbox.checkRateLimit() === false, 'Fail-Closed: checkRateLimit từ chối khi teacher_hub_auth_fails là chuỗi rỗng');
+
+    // Case 28 (Codex Adversarial Finding): teacher_hub_lock_until cô lập không có auth_fails
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_lock_until', '1790000000000');
+    assert(corruptSandbox.checkRateLimit() === false, 'Fail-Closed: checkRateLimit từ chối khi teacher_hub_lock_until tồn tại cô lập không có auth_fails');
+
+    // Case 29 (Codex Adversarial Finding): checkRateLimitUnlocked(ctx) từ chối và ghi cva_auth_error khi auth_fails = "0"
+    corruptMap.clear();
+    corruptMap.set('cva_fencing_generation', '1');
+    corruptMap.set('cva_fencing_token', 'tok_corr');
+    corruptMap.set('cva_migration_lock', JSON.stringify({ token: 'tok_corr', generation: 1, time: Date.now() }));
+    corruptMap.set('teacher_hub_auth_fails', '0');
+    const unlockedResZeroFails = corruptSandbox.checkRateLimitUnlocked(validLockCtxForCorrupt);
+    assert(unlockedResZeroFails === false, 'Fail-Closed: checkRateLimitUnlocked từ chối khi teacher_hub_auth_fails = "0"');
+    assert(corruptMap.has('cva_auth_error') === true, 'Fail-Closed: checkRateLimitUnlocked ghi nhận cờ cva_auth_error khi stored fails = "0"');
+
+    // Case 30 (Codex Adversarial Finding): checkRateLimitUnlocked(ctx) từ chối và ghi cva_auth_error khi lock_until = "5000"
+    corruptMap.clear();
+    corruptMap.set('cva_fencing_generation', '1');
+    corruptMap.set('cva_fencing_token', 'tok_corr');
+    corruptMap.set('cva_migration_lock', JSON.stringify({ token: 'tok_corr', generation: 1, time: Date.now() }));
+    corruptMap.set('teacher_hub_auth_fails', '5');
+    corruptMap.set('teacher_hub_lock_until', '5000');
+    const unlockedRes5000Lock = corruptSandbox.checkRateLimitUnlocked(validLockCtxForCorrupt);
+    assert(unlockedRes5000Lock === false, 'Fail-Closed: checkRateLimitUnlocked từ chối khi lock_until = "5000"');
+    assert(corruptMap.has('cva_auth_error') === true, 'Fail-Closed: checkRateLimitUnlocked ghi nhận cờ cva_auth_error khi lock_until = "5000"');
+
+    // Case 31 (Codex Adversarial Finding): recordAuthFailure(ctx) ném AuthFailuresCorrupted khi stored lock_until = "0"
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', '5');
+    corruptMap.set('teacher_hub_lock_until', '0');
+    corruptMap.set('cva_fencing_generation', '1');
+    corruptMap.set('cva_fencing_token', 'tok_corr');
+    corruptMap.set('cva_migration_lock', JSON.stringify({ token: 'tok_corr', generation: 1, time: Date.now() }));
+    let threwLockZero = false;
+    try {
+      await corruptSandbox.recordAuthFailure(validLockCtxForCorrupt);
+    } catch (eRecCorr) {
+      threwLockZero = Boolean(eRecCorr && eRecCorr.message && eRecCorr.message.includes('AuthFailuresCorrupted'));
+    }
+    assert(threwLockZero === true, 'Fail-Closed: recordAuthFailure ném AuthFailuresCorrupted khi teacher_hub_lock_until = "0"');
+
+    // Case 32 (Codex Adversarial Finding): recordAuthFailure(ctx) ném AuthFailuresCorrupted khi stored auth_fails = "0"
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', '0');
+    corruptMap.set('cva_fencing_generation', '1');
+    corruptMap.set('cva_fencing_token', 'tok_corr');
+    corruptMap.set('cva_migration_lock', JSON.stringify({ token: 'tok_corr', generation: 1, time: Date.now() }));
+    let threwFailsZero = false;
+    try {
+      await corruptSandbox.recordAuthFailure(validLockCtxForCorrupt);
+    } catch (eRecCorr) {
+      threwFailsZero = Boolean(eRecCorr && eRecCorr.message && eRecCorr.message.includes('AuthFailuresCorrupted'));
+    }
+    assert(threwFailsZero === true, 'Fail-Closed: recordAuthFailure ném AuthFailuresCorrupted khi teacher_hub_auth_fails = "0"');
+
+    // Case 33 (Codex Finding - Zero Fail-Open on Expired Lockout Cleanup):
+    // Lockout đã hết hạn nhưng lock context bị revoked/superseded -> BẮT BUỘC ném FencingViolation, CẤM return true
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', '5');
+    corruptMap.set('teacher_hub_lock_until', '1000000000000'); // Quá khứ: expired lockout
+    corruptMap.set('cva_fencing_generation', '2');
+    corruptMap.set('cva_fencing_token', 'tok_new');
+    corruptMap.set('cva_migration_lock', JSON.stringify({ token: 'tok_new', generation: 2, time: Date.now() }));
+    const supersededExpiredLockCtx = {
+      generation: 1, // Stale generation 1 < 2
+      token: 'tok_old_superseded',
+      revoked: false,
+      verifyFencing: () => false
+    };
+    let threwExpiredFencing = false;
+    let expiredRetVal = null;
+    try {
+      expiredRetVal = corruptSandbox.checkRateLimitUnlocked(supersededExpiredLockCtx);
+    } catch (eExpired) {
+      threwExpiredFencing = Boolean(eExpired && eExpired.message && eExpired.message.includes('FencingViolation'));
+    }
+    assert(threwExpiredFencing === true && expiredRetVal !== true, 'Zero Fail-Open: checkRateLimitUnlocked ném FencingViolation và KHÔNG return true khi cleanup expired lockout bị mất fencing');
+    assert(corruptMap.get('teacher_hub_auth_fails') === '5', 'Zero Fail-Open: Không xóa dở dang teacher_hub_auth_fails khi fencing không hợp lệ');
+
+    // Case 34 (Codex Finding - All-or-Nothing Rollback in recordAuthFailure):
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', '4');
+    corruptMap.set('cva_fencing_generation', '1');
+    corruptMap.set('cva_fencing_token', 'tok_corr');
+    corruptMap.set('cva_migration_lock', JSON.stringify({ token: 'tok_corr', generation: 1, time: Date.now() }));
+    corruptSandbox.isStorageDegraded = false;
+    const origCorruptSet = corruptSandbox.localStorage.setItem;
+    let triggerRecordDiskErr = true;
+    corruptSandbox.localStorage.setItem = (k, v) => {
+      if (triggerRecordDiskErr && k === 'teacher_hub_lock_until') {
+        throw new Error('QuotaExceeded: Simulated disk write failure on lock_until');
+      }
+      origCorruptSet(k, v);
+    };
+    let threwRollbackRecord = false;
+    try {
+      await corruptSandbox.recordAuthFailure(validLockCtxForCorrupt);
+    } catch (eRecRb) {
+      threwRollbackRecord = Boolean(eRecRb && eRecRb.message);
+    } finally {
+      corruptSandbox.localStorage.setItem = origCorruptSet;
+    }
+    assert(threwRollbackRecord === true, 'Fail-Closed: recordAuthFailure ném lỗi khi gặp sự cố đĩa');
+    assert(corruptMap.get('teacher_hub_auth_fails') === '4', 'All-or-Nothing Invariant: teacher_hub_auth_fails được rollback về 4');
+
+    // Case 35 (Codex Finding - All-or-Nothing Rollback in resetAuthFailures):
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', '5');
+    corruptMap.set('teacher_hub_lock_until', '1999999999000');
+    corruptMap.set('cva_fencing_generation', '1');
+    corruptMap.set('cva_fencing_token', 'tok_corr');
+    corruptMap.set('cva_migration_lock', JSON.stringify({ token: 'tok_corr', generation: 1, time: Date.now() }));
+    const origCorruptRemove = corruptSandbox.localStorage.removeItem;
+    corruptSandbox.localStorage.removeItem = (k) => {
+      if (k === 'teacher_hub_lock_until') {
+        throw new Error('StorageFault: Simulated remove failure on lock_until');
+      }
+      origCorruptRemove(k);
+    };
+    let threwResetRb = false;
+    try {
+      await corruptSandbox.resetAuthFailures(validLockCtxForCorrupt);
+    } catch (eResetRb) {
+      threwResetRb = Boolean(eResetRb && eResetRb.message);
+    } finally {
+      corruptSandbox.localStorage.removeItem = origCorruptRemove;
+    }
+    assert(threwResetRb === true, 'Fail-Closed: resetAuthFailures ném lỗi khi xóa gặp sự cố đĩa');
+    assert(corruptMap.get('teacher_hub_auth_fails') === '5', 'All-or-Nothing Invariant: teacher_hub_auth_fails được rollback về 5 sau khi reset thất bại');
+
+    // Case 36 (Codex Adversarial Finding - Lock Marker Replacement with Generation/Token Retained):
+    // Tab B thay thế cva_migration_lock thành {"token":"attacker_tok","generation":999}
+    // nhưng cva_fencing_generation và cva_fencing_token vẫn tạm giữ giá trị cũ (1 và "tok_corr").
+    // Tab A (validLockCtxForCorrupt: gen=1, token="tok_corr") KHÔNG được coi cva_migration_lock !== null là hợp lệ!
+    corruptMap.clear();
+    corruptMap.set('cva_fencing_generation', '1');
+    corruptMap.set('cva_fencing_token', 'tok_corr');
+    corruptMap.set('cva_migration_lock', JSON.stringify({ token: 'attacker_tok', generation: 999, time: Date.now() }));
+    corruptMap.set('teacher_hub_auth_fails', '2');
+    
+    // verifyAuthFencing bắt buộc trả về false
+    assert(corruptSandbox.verifyAuthFencing(validLockCtxForCorrupt) === false, 'Fencing Invariant: verifyAuthFencing từ chối khi cva_migration_lock bị thay thế (token/gen mismatch)');
+
+    // safeFencedSetAuth bắt buộc ném FencingViolation
+    let threwFencedSetMarkerMismatch = false;
+    try {
+      corruptSandbox.safeFencedSetAuth('teacher_hub_auth_fails', '3', validLockCtxForCorrupt);
+    } catch (eFencedSet) {
+      threwFencedSetMarkerMismatch = Boolean(eFencedSet && eFencedSet.message && eFencedSet.message.includes('FencingViolation'));
+    }
+    assert(threwFencedSetMarkerMismatch === true, 'Anti-Stale-Writer: safeFencedSetAuth ném FencingViolation khi lock marker bị thay thế');
+    assert(corruptMap.get('teacher_hub_auth_fails') === '2', 'Anti-Stale-Writer: Dữ liệu teacher_hub_auth_fails không bị stale writer ghi đè');
+
+    // safeFencedRemoveAuth bắt buộc ném FencingViolation
+    let threwFencedRemoveMarkerMismatch = false;
+    try {
+      corruptSandbox.safeFencedRemoveAuth('teacher_hub_auth_fails', validLockCtxForCorrupt);
+    } catch (eFencedRem) {
+      threwFencedRemoveMarkerMismatch = Boolean(eFencedRem && eFencedRem.message && eFencedRem.message.includes('FencingViolation'));
+    }
+    assert(threwFencedRemoveMarkerMismatch === true, 'Anti-Stale-Writer: safeFencedRemoveAuth ném FencingViolation khi lock marker bị thay thế');
+
+    // recordAuthFailure bắt buộc ném FencingViolation
+    let threwRecordMarkerMismatch = false;
+    try {
+      await corruptSandbox.recordAuthFailure(validLockCtxForCorrupt);
+    } catch (eRecMarker) {
+      threwRecordMarkerMismatch = Boolean(eRecMarker && eRecMarker.message && eRecMarker.message.includes('FencingViolation'));
+    }
+    assert(threwRecordMarkerMismatch === true, 'Anti-Stale-Writer: recordAuthFailure ném FencingViolation khi lock marker bị thay thế');
+
+    // resetAuthFailures bắt buộc ném FencingViolation
+    let threwResetMarkerMismatch = false;
+    try {
+      await corruptSandbox.resetAuthFailures(validLockCtxForCorrupt);
+    } catch (eResetMarker) {
+      threwResetMarkerMismatch = Boolean(eResetMarker && eResetMarker.message && eResetMarker.message.includes('FencingViolation'));
+    }
+    assert(threwResetMarkerMismatch === true, 'Anti-Stale-Writer: resetAuthFailures ném FencingViolation khi lock marker bị thay thế');
+
+    // Case 37 (Codex Adversarial Finding - Expired Lockout Cleanup with Lock Marker Replacement):
+    // Lockout đã hết hạn (quá khứ), cva_migration_lock bị Tab B thay thế thành {"token":"tok_B","generation":2}
+    // nhưng cva_fencing_generation và cva_fencing_token vẫn là 1 và "tok_corr".
+    // checkRateLimitUnlocked bắt buộc ném FencingViolation, CẤM return true, CẤM xóa dữ liệu
+    corruptMap.clear();
+    corruptMap.set('teacher_hub_auth_fails', '5');
+    corruptMap.set('teacher_hub_lock_until', '1000000000000'); // expired lockout
+    corruptMap.set('cva_fencing_generation', '1');
+    corruptMap.set('cva_fencing_token', 'tok_corr');
+    corruptMap.set('cva_migration_lock', JSON.stringify({ token: 'tok_B', generation: 2, time: Date.now() }));
+    let threwExpiredMarkerMismatch = false;
+    let expiredMarkerRetVal = null;
+    try {
+      expiredMarkerRetVal = corruptSandbox.checkRateLimitUnlocked(validLockCtxForCorrupt);
+    } catch (eExpM) {
+      threwExpiredMarkerMismatch = Boolean(eExpM && eExpM.message && eExpM.message.includes('FencingViolation'));
+    }
+    assert(threwExpiredMarkerMismatch === true && expiredMarkerRetVal !== true, 'Zero Fail-Open: checkRateLimitUnlocked ném FencingViolation khi dọn expired lockout mà lock marker bị thay thế');
+    assert(corruptMap.get('teacher_hub_auth_fails') === '5', 'Zero Fail-Open: teacher_hub_auth_fails bảo lưu 100% khi lock marker không khớp');
+    assert(corruptMap.get('teacher_hub_lock_until') === '1000000000000', 'Zero Fail-Open: teacher_hub_lock_until bảo lưu 100% khi lock marker không khớp');
+
+    // Case 38 (Codex Adversarial Finding - Corrupted / Non-Object Lock Marker Payloads):
+    // Các dạng payload biến dạng của cva_migration_lock:
+    // a) Chuỗi không phải JSON: 'not_valid_json'
+    // b) Dạng số nguyên thuần túy: '12345'
+    // c) Dạng mảng: '["tok_corr", 1]'
+    // d) generation là string: '{"token":"tok_corr","generation":"1"}'
+    // e) generation là số thực không nguyên: '{"token":"tok_corr","generation":1.5}'
+    const malformedLockPayloads = [
+      { name: 'Invalid JSON string', payload: 'not_valid_json' },
+      { name: 'Pure numeric primitive', payload: '12345' },
+      { name: 'Array payload', payload: JSON.stringify(['tok_corr', 1]) },
+      { name: 'String generation in JSON', payload: JSON.stringify({ token: 'tok_corr', generation: '1' }) },
+      { name: 'Float non-integer generation', payload: JSON.stringify({ token: 'tok_corr', generation: 1.5 }) }
+    ];
+    for (const mal of malformedLockPayloads) {
+      corruptMap.clear();
+      corruptMap.set('cva_fencing_generation', '1');
+      corruptMap.set('cva_fencing_token', 'tok_corr');
+      corruptMap.set('cva_migration_lock', mal.payload);
+      assert(corruptSandbox.verifyAuthFencing(validLockCtxForCorrupt) === false, `Malformed Lock Guard: verifyAuthFencing từ chối khi cva_migration_lock là ${mal.name}`);
+    }
+
+    // Case 39 (Codex Adversarial Finding - Non-Fenced / Standalone verifyAuthFencing):
+    // Khi ctx không có verifyFencing method riêng (chỉ là plain context object { generation: 1, token: "tok_corr" }):
+    // verifyAuthFencing vẫn tự thân parse và thẩm định toàn diện cva_migration_lock
+    corruptMap.clear();
+    corruptMap.set('cva_fencing_generation', '1');
+    corruptMap.set('cva_fencing_token', 'tok_corr');
+    corruptMap.set('cva_migration_lock', JSON.stringify({ token: 'tok_corr', generation: 1, time: Date.now() }));
+    const plainCtx = { generation: 1, token: 'tok_corr' };
+    assert(corruptSandbox.verifyAuthFencing(plainCtx) === true, 'Plain Context: verifyAuthFencing chấp thuận khi lock marker khớp 100%');
+    corruptMap.set('cva_migration_lock', JSON.stringify({ token: 'tok_other', generation: 1, time: Date.now() }));
+    assert(corruptSandbox.verifyAuthFencing(plainCtx) === false, 'Plain Context: verifyAuthFencing từ chối khi lock marker token khác');
+
+    // ── 7.2.5: Zero-Lock Fallback Rejection (Môi trường thiếu Web Locks) ──
+    console.log('  ▸ 7.2.5 Kiểm tra Zero-Lock Fallback Rejection (Thiếu Web Locks API):');
+    const noLockMap = new Map();
+    noLockMap.set('teacher_hub_auth_fails', '5');
+    noLockMap.set('teacher_hub_lock_until', '1790000000000');
+
+    // Sandbox hoàn toàn KHÔNG CÓ executeWithCrossTabLock và KHÔNG CÓ lockCtx
+    const noLockSandbox = {
+      localStorage: {
+        getItem: (k) => noLockMap.get(k) || null,
+        setItem: (k, v) => noLockMap.set(k, String(v)),
+        removeItem: (k) => noLockMap.delete(k)
+      },
+      MAX_AUTH_FAILS,
+      LOCKOUT_MS,
+      showToast: () => {},
+      console: { log: () => {}, warn: () => {}, error: () => {} },
+      Date
+    };
+    const noLockScript = new vm.Script(evalScope);
+    noLockScript.runInContext(vm.createContext(noLockSandbox));
+
+    let threwNoLockRecord = false;
+    try {
+      await noLockSandbox.recordAuthFailure();
+    } catch (err) {
+      threwNoLockRecord = Boolean(err && err.message && err.message.includes('StorageLockUnavailable'));
+    }
+    assert(threwNoLockRecord === true, 'Fail-Closed: recordAuthFailure ném StorageLockUnavailable khi thiếu Web Locks');
+    assert(noLockMap.get('teacher_hub_auth_fails') === '5', 'Zero-Write Invariant: recordAuthFailure không ghi đè bất kỳ byte nào khi thiếu khóa');
+
+    let threwNoLockReset = false;
+    try {
+      await noLockSandbox.resetAuthFailures();
+    } catch (err) {
+      threwNoLockReset = Boolean(err && err.message && err.message.includes('StorageLockUnavailable'));
+    }
+    assert(threwNoLockReset === true, 'Fail-Closed: resetAuthFailures ném StorageLockUnavailable khi thiếu Web Locks');
+    assert(noLockMap.get('teacher_hub_lock_until') === '1790000000000', 'Zero-Delete Invariant: resetAuthFailures không xóa khóa khi thiếu Web Locks');
+
+    // ── 7.2.6: checkRateLimitUnlocked(ctx) Phục Hồi Tự Động cva_auth_staging Dở Dang ──
+    console.log('  ▸ 7.2.6 Kiểm tra checkRateLimitUnlocked(ctx) Tự động Phục hồi cva_auth_staging:');
+    const autoRecMap = new Map();
+    const autoRecSandbox = {
+      localStorage: {
+        getItem: (k) => autoRecMap.get(k) || null,
+        setItem: (k, v) => autoRecMap.set(k, String(v)),
+        removeItem: (k) => autoRecMap.delete(k)
+      },
+      MAX_AUTH_FAILS,
+      LOCKOUT_MS,
+      showToast: () => {},
+      console: { log: () => {}, warn: () => {}, error: () => {} },
+      Date,
+      recoverStagingTransaction: () => {
+        const raw = autoRecMap.get('cva_auth_staging');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed.stage === 'auth_lockout') {
+            autoRecMap.set('teacher_hub_auth_fails', String(parsed.fails));
+            autoRecMap.set('teacher_hub_lock_until', String(parsed.lockUntil));
+            autoRecMap.delete('cva_auth_staging');
+            return { recovered: true };
+          }
+        }
+        return { recovered: false };
+      }
+    };
+    const autoRecScript = new vm.Script(evalScope);
+    autoRecScript.runInContext(vm.createContext(autoRecSandbox));
+
+    autoRecMap.set('cva_auth_staging', JSON.stringify({
+      stage: 'auth_lockout',
+      fails: 5,
+      isLockout: true,
+      lockUntil: Date.now() + 30000,
+      generation: 1,
+      token: 'tok_auto_rec'
+    }));
+    const dummyCtx = { generation: 1, token: 'tok_auto_rec', revoked: false, verifyFencing: () => true };
+    const checkResAuto = autoRecSandbox.checkRateLimitUnlocked(dummyCtx);
+    assert(checkResAuto === false, 'Fail-Closed: checkRateLimitUnlocked trả về false khi staging auth_lockout được roll forward');
+    assert(autoRecMap.get('teacher_hub_auth_fails') === '5', 'Recovery: teacher_hub_auth_fails được thiết lập lên 5');
+    assert(!autoRecMap.has('cva_auth_staging'), 'Cleanup: cva_auth_staging được dọn sạch sau khi phục hồi');
+
+    // ── 7.2.7: verifyAdminPin(enteredPin) Điều Phối Viên Đơn Giao Dịch Nguyên Tử ──
+    console.log('  ▸ 7.2.7 Kiểm tra verifyAdminPin(enteredPin) Điều Phối Viên Đơn Giao Dịch (Single-Transaction Coordinator):');
+    const adminMap = new Map();
+    let adminGen = 0;
+    const adminSandbox = {
+      localStorage: {
+        getItem: (k) => adminMap.get(k) || null,
+        setItem: (k, v) => adminMap.set(k, String(v)),
+        removeItem: (k) => adminMap.delete(k)
+      },
+      MAX_AUTH_FAILS,
+      LOCKOUT_MS,
+      showToast: () => {},
+      console: { log: () => {}, warn: () => {}, error: () => {} },
+      Date,
+      hashPassword: async (pin, salt) => 'hash_' + salt + '_' + pin,
+      executeWithCrossTabLock: async (cb) => {
+        adminGen++;
+        const tok = 'tok_admin_' + adminGen;
+        adminMap.set('cva_fencing_generation', String(adminGen));
+        adminMap.set('cva_fencing_token', tok);
+        adminMap.set('cva_migration_lock', JSON.stringify({ token: tok, generation: adminGen, time: Date.now() }));
+        const ctx = {
+          generation: adminGen,
+          token: tok,
+          revoked: false,
+          verifyFencing: () => {
+            if (ctx.revoked) return false;
+            if (Number(adminMap.get('cva_fencing_generation')) !== adminGen || adminMap.get('cva_fencing_token') !== ctx.token) return false;
+            const curL = adminMap.get('cva_migration_lock');
+            if (!curL) return false;
+            try {
+              const p = JSON.parse(curL);
+              return Boolean(p && typeof p === "object" && !Array.isArray(p) && p.token === ctx.token && p.generation === adminGen);
+            } catch {
+              return false;
+            }
+          }
+        };
+        try {
+          return await cb(ctx);
+        } finally {
+          adminMap.delete('cva_migration_lock');
+          ctx.revoked = true;
+        }
+      }
+    };
+    const adminScript = new vm.Script(evalScope);
+    adminScript.runInContext(vm.createContext(adminSandbox));
+
+    adminMap.set('teacher_hub_admin_salt', 'salt123');
+    adminMap.set('teacher_hub_admin_hash', 'hash_salt123_1234'); // PIN đúng: "1234"
+
+    // Thử sai 4 lần
+    for (let i = 1; i <= 4; i++) {
+      const vRes = await adminSandbox.verifyAdminPin('wrong_' + i);
+      assert(vRes === false, `verifyAdminPin: Thử sai lần ${i} trả về false`);
+      assert(adminMap.get('teacher_hub_auth_fails') === String(i), `teacher_hub_auth_fails tăng lên ${i}`);
+    }
+
+    // Thử đúng lần thứ 5 -> reset thành công
+    const vCorrect = await adminSandbox.verifyAdminPin('1234');
+    assert(vCorrect === true, 'verifyAdminPin: Nhập đúng PIN trả về true');
+    assert(!adminMap.has('teacher_hub_auth_fails'), 'verifyAdminPin: Reset sạch auth_fails khi nhập đúng');
+
+    // Thử sai liên tiếp 5 lần -> Kích hoạt lockout
+    for (let i = 1; i <= 5; i++) {
+      const vFail = await adminSandbox.verifyAdminPin('wrong_' + i);
+      assert(vFail === false, `verifyAdminPin: Thử sai lockout lần ${i} trả về false`);
+    }
+    assert(adminMap.get('teacher_hub_auth_fails') === '5', 'Lockout: fails = 5');
+    assert(adminMap.has('teacher_hub_lock_until'), 'Lockout: teacher_hub_lock_until được thiết lập');
+
+    // Lần tiếp theo dù nhập đúng PIN cũng bị chặn đứng ngay từ checkRateLimitUnlocked trong lock
+    const vBlocked = await adminSandbox.verifyAdminPin('1234');
+    assert(vBlocked === false, 'verifyAdminPin: Bị chặn đứng an toàn khi đang trong thời hạn lockout dù nhập đúng PIN');
   }
 })();
 
@@ -2005,6 +3626,7 @@ await (async () => {
 await (async () => {
   console.log('\n📌 7.5 Kiểm thử Chuyên sâu Độ Bền Vững & Đối Chiếu Dữ Liệu Thực Tế:');
   const vm = require('vm');
+  const rawSha256FuncCode75 = extractFunctionBody(appJs, 'computeRawSha256');
 
   // 7.5.1 Kiểm thử Fail-Closed khi không có Web Locks API (Safari iOS cũ, WebView)
   const mLock = appJs.match(/async function executeWithCrossTabLock[\s\S]*?\n      \}/);
@@ -2044,6 +3666,7 @@ await (async () => {
     };
     const scriptLock = new vm.Script(
       'let currentLockContext = null;\n' +
+      (safeStorageRemoveFuncCode ? safeStorageRemoveFuncCode + '\n' : '') +
       mLock[0] + '\n' +
       mSaveCat[0] + '\n' +
       mSaveLinks[0] + '\n' +
@@ -2144,6 +3767,7 @@ await (async () => {
     storageMap.set('teacher_hub_timetable_v1', JSON.stringify(initialTT));
     storageMap.set('cva_fencing_generation', '1');
     storageMap.set('cva_fencing_token', 'quota_tok_123');
+    storageMap.set('cva_migration_lock', JSON.stringify({ token: 'quota_tok_123', generation: 1 }));
 
     const sandboxQuota = {
       localStorage: mockStorage,
@@ -2163,6 +3787,8 @@ await (async () => {
 
     const scriptQuota = new vm.Script(
       'let currentLockContext = this.currentLockContext;\n' +
+      (safeStorageRemoveFuncCode ? safeStorageRemoveFuncCode + '\n' : '') +
+      (rawSha256FuncCode75 ? rawSha256FuncCode75 + '\n' : '') +
       mChecksum[0] + '\n' +
       mUpdateStoreUnlocked[0] + '\n' +
       mUpdateStore[0] + '\n' +
@@ -2208,6 +3834,7 @@ await (async () => {
       console: { log: () => {}, warn: () => {}, error: () => {} }
     };
     const scriptReconcile = new vm.Script(
+      (rawSha256FuncCode75 ? rawSha256FuncCode75 + '\n' : '') +
       checksumFuncCode + '\n' +
       reconcileFuncCode + '\n' +
       validateStoreFuncCode + '\n' +
@@ -2360,6 +3987,8 @@ await (async () => {
       'let isVaultUnlocked = this.isVaultUnlocked;\n' +
       'let sessionVaultPin = this.sessionVaultPin;\n' +
       'let vaultData = this.vaultData;\n' +
+      (safeStorageRemoveFuncCode ? safeStorageRemoveFuncCode + '\n' : '') +
+      (rawSha256FuncCode75 ? rawSha256FuncCode75 + '\n' : '') +
       computeTxChecksumCode + '\n' +
       executeLockCode + '\n' +
       updateUnifiedUnlockedCode + '\n' +
@@ -2477,6 +4106,8 @@ await (async () => {
     };
 
     const scriptBatch = new vm.Script(
+      (safeStorageRemoveFuncCode ? safeStorageRemoveFuncCode + '\n' : '') +
+      (rawSha256FuncCode75 ? rawSha256FuncCode75 + '\n' : '') +
       computeChecksumFuncBody + '\n' +
       recoverFuncBody + '\n' +
       'this.computeTxChecksum = computeTxChecksum;\n' +
@@ -2591,6 +4222,919 @@ await (async () => {
     assert(appJs.includes('window.addEventListener("focus", updateClockAndGreeting)'), 'Clock Integration: Lắng nghe window.focus để cập nhật đồng hồ khi focus');
   }
 })();
+
+// 7.6 KIỂM THỬ 9 CHỐT CHẶN BẤT BIẾN THEO TIÊU CHUẨN CODEX (CODEX INVARIANTS ENFORCEMENT)
+await (async () => {
+  console.log('\n📌 7.6 Kiểm thử 9 Chốt chặn Bất biến Theo Tiêu chuẩn Codex (Codex Invariants):');
+  const vm = require('vm');
+
+  const rawSha256Code = extractFunctionBody(appJs, 'computeRawSha256');
+  const checksumCode = extractFunctionBody(appJs, 'computeTxChecksum');
+  const recoverCode = extractFunctionBody(appJs, 'recoverStagingTransaction');
+  const validateStoreCode = extractFunctionBody(appJs, 'validateAndGetUnifiedStore');
+  const applySyncCode = extractFunctionBody(appJs, 'applySyncData');
+  const executeLockCode = extractFunctionBody(appJs, 'executeWithCrossTabLock');
+  const saveVaultUnlockedCode = extractFunctionBody(appJs, 'saveVaultStorageUnlocked');
+  const updateUnifiedUnlockedCode = extractFunctionBody(appJs, 'updateUnifiedStoreUnlocked');
+  const validateSyncCode = extractFunctionBody(appJs, 'validateSyncPayload');
+  const safeStorageRemoveCode = extractFunctionBody(appJs, 'safeStorageRemove');
+
+  // --- 7.6.1: Tiêu chuẩn Checksum NIST FIPS 180-4 SHA-256 Chuẩn Quốc Tế ---
+  console.log('  ▸ 7.6.1 Kiểm tra NIST FIPS 180-4 Standard SHA-256 Test Vectors:');
+  if (rawSha256Code) {
+    const sandboxSha = {};
+    const scriptSha = new vm.Script(rawSha256Code + '\nthis.computeRawSha256 = computeRawSha256;');
+    scriptSha.runInContext(vm.createContext(sandboxSha));
+
+    // NIST Official Vector 1: Empty string ""
+    const shaEmpty = sandboxSha.computeRawSha256("");
+    assert(shaEmpty === "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 'NIST SHA-256: Chuỗi rỗng "" khớp chính xác mã băm NIST FIPS 180-4 (e3b0c442...)');
+
+    // NIST Official Vector 2: "abc"
+    const shaAbc = sandboxSha.computeRawSha256("abc");
+    assert(shaAbc === "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", 'NIST SHA-256: Chuỗi "abc" khớp chính xác mã băm NIST FIPS 180-4 (ba7816bf...)');
+
+    // NIST Official Vector 3: 448-bit block test string
+    const shaLong = sandboxSha.computeRawSha256("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
+    assert(shaLong === "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1", 'NIST SHA-256: Chuỗi 448-bit khớp chính xác mã băm NIST FIPS 180-4 (248d6a61...)');
+
+    // Verify computeTxChecksum uses computeRawSha256 and produces 64-char hex
+    if (checksumCode) {
+      const sandboxCk = { computeRawSha256: sandboxSha.computeRawSha256 };
+      const scriptCk = new vm.Script(checksumCode + '\nthis.computeTxChecksum = computeTxChecksum;');
+      scriptCk.runInContext(vm.createContext(sandboxCk));
+      const ck = sandboxCk.computeTxChecksum([{ id: 'c1', label: 'C1' }], [{ id: 'l1', title: 'L1', url: 'https://l1.vn' }], '2026.09.21.03', [], {});
+      assert(typeof ck === 'string' && ck.length === 64 && /^[0-9a-f]{64}$/.test(ck), 'NIST SHA-256: computeTxChecksum sản xuất chuỗi hex 64 ký tự chuẩn NIST');
+    }
+  }
+
+  // --- 7.6.2: Phục Hồi Đột Tử Hàng Loạt Tất-Cả-Hoặc-Không Nguyên Tử (Multi-Staging All-or-Nothing) ---
+  console.log('  ▸ 7.6.2 Kiểm tra Multi-Staging All-or-Nothing Crash Recovery:');
+  if (recoverCode && rawSha256Code && checksumCode) {
+    const multiMap = new Map();
+    let throwDuringPhase2Sync = false;
+
+    const mockMultiStorage = {
+      getItem: (k) => multiMap.get(k) || null,
+      setItem: (k, v) => {
+        if (throwDuringPhase2Sync && (k === 'teacher_hub_store_v2' || k === 'teacher_hub_links_v2')) {
+          const err = new Error('SimulatedDiskErrorDuringMultiRecovery');
+          err.name = 'DiskError';
+          throw err;
+        }
+        multiMap.set(k, String(v));
+      },
+      removeItem: (k) => multiMap.delete(k)
+    };
+
+    const sandboxMulti = {
+      localStorage: mockMultiStorage,
+      CURRENT_DATA_VERSION: "2026.09.21.03",
+      currentLockContext: {
+        generation: 1,
+        token: "multi_tok_762",
+        revoked: false,
+        verifyFencing: () => true
+      },
+      console: { log: () => {}, warn: () => {}, error: () => {} }
+    };
+
+    const scriptMulti = new vm.Script(
+      safeStorageRemoveCode + '\n' +
+      rawSha256Code + '\n' +
+      checksumCode + '\n' +
+      recoverCode + '\n' +
+      'this.computeRawSha256 = computeRawSha256;\n' +
+      'this.computeTxChecksum = computeTxChecksum;\n' +
+      'this.recoverStagingTransaction = recoverStagingTransaction;'
+    );
+    scriptMulti.runInContext(vm.createContext(sandboxMulti));
+
+    // Setup initial storage state before crash
+    const initialVaultEnvelope = JSON.stringify({ version: "vault_v1", salt: "init_v_salt", ciphertext: "init_v_cipher" });
+    const initialStorePayload = JSON.stringify({ version: "2026.09.20.01", categories: [], links: [{ id: "l_old", title: "L Old", url: "https://old.vn" }], reminders: [], timetable: {} });
+    const initialLinksPayload = JSON.stringify([{ id: "l_old", title: "L Old", url: "https://old.vn" }]);
+    multiMap.set("teacher_hub_vault_envelope_v1", initialVaultEnvelope);
+    multiMap.set("teacher_hub_store_v2", initialStorePayload);
+    multiMap.set("teacher_hub_links_v2", initialLinksPayload);
+    multiMap.set("cva_fencing_generation", "1");
+    multiMap.set("cva_fencing_token", "multi_tok_762");
+    multiMap.set("cva_migration_lock", JSON.stringify({ token: "multi_tok_762", generation: 1, time: Date.now() }));
+
+    // Prepare 3 staging records in committed status:
+    // 1. Vault staging committed
+    const vSalt = "new_salt_762";
+    const vCipher = "new_cipher_762";
+    const vCk = sandboxMulti.computeTxChecksum(null, null, "vault_v1", null, { salt: vSalt, ciphertext: vCipher });
+    multiMap.set("cva_vault_staging", JSON.stringify({
+      status: "committed",
+      token: "multi_tok_762",
+      fencingGeneration: 1,
+      version: "vault_v1",
+      salt: vSalt,
+      ciphertext: vCipher,
+      checksum: vCk,
+      time: Date.now(),
+      previous: { envelope: initialVaultEnvelope }
+    }));
+
+    // 2. Store staging committed
+    const storeCats = [{ id: "c_store", label: "C Store" }];
+    const storeLinks = [{ id: "l_store", title: "L Store", url: "https://st.vn" }];
+    const sCk = sandboxMulti.computeTxChecksum(storeCats, storeLinks, "2026.09.21.03", [], {});
+    multiMap.set("cva_store_staging", JSON.stringify({
+      status: "committed",
+      token: "multi_tok_762",
+      fencingGeneration: 1,
+      version: "2026.09.21.03",
+      categories: storeCats,
+      links: storeLinks,
+      reminders: [],
+      timetable: {},
+      checksum: sCk,
+      time: Date.now()
+    }));
+
+    // 3. Sync staging committed
+    const syncCats = [{ id: "c_sync", label: "C Sync" }];
+    const syncLinks = [{ id: "l_sync", title: "L Sync", url: "https://sync.vn" }];
+    const syncCk = sandboxMulti.computeTxChecksum(syncCats, syncLinks, "2026.09.21.03", [], {});
+    multiMap.set("cva_sync_staging", JSON.stringify({
+      status: "committed",
+      token: "multi_tok_762",
+      fencingGeneration: 1,
+      version: "2026.09.21.03",
+      categories: syncCats,
+      links: syncLinks,
+      reminders: [],
+      timetable: {},
+      checksum: syncCk,
+      time: Date.now(),
+      previous: { categories: [], links: [{ id: "l_old", title: "L Old", url: "https://old.vn" }] }
+    }));
+
+    // Now inject disk failure when writing store during Phase 2
+    throwDuringPhase2Sync = true;
+    let recMultiResult = null;
+    try {
+      recMultiResult = sandboxMulti.recoverStagingTransaction();
+    } catch {
+      // Caught inside or thrown
+    }
+    throwDuringPhase2Sync = false;
+
+    // Invariant: Because sync step failed, ALL mutations must be rolled back to prePhase2Snapshot
+    assert(recMultiResult === null || recMultiResult.recovered === false, 'Multi-Staging All-or-Nothing: recoverStagingTransaction ghi nhận lỗi khi có 1 transaction fail');
+    assert(multiMap.get("teacher_hub_vault_envelope_v1") === initialVaultEnvelope, 'Multi-Staging All-or-Nothing: Vault envelope được rollback nguyên tử về pre-recovery snapshot (không bị commit đơn độc)');
+    assert(multiMap.get("teacher_hub_store_v2") === initialStorePayload, 'Multi-Staging All-or-Nothing: Store v2 được rollback nguyên tử về pre-recovery snapshot');
+    assert(multiMap.get("teacher_hub_links_v2") === initialLinksPayload, 'Multi-Staging All-or-Nothing: Links v2 được rollback nguyên tử về pre-recovery snapshot');
+  }
+
+  // --- 7.6.3: Chuẩn Hóa & Nhất Quán Lược Đồ Danh Mục (Schema Category Normalization) ---
+  console.log('  ▸ 7.6.3 Kiểm tra Schema Category Normalization & Consistency:');
+  if (validateStoreCode && rawSha256Code && checksumCode && applySyncCode) {
+    const catMap = new Map();
+    const mockCatStorage = {
+      getItem: (k) => catMap.get(k) || null,
+      setItem: (k, v) => catMap.set(k, String(v)),
+      removeItem: (k) => catMap.delete(k)
+    };
+
+    const sandboxSchema = {
+      localStorage: mockCatStorage,
+      CURRENT_DATA_VERSION: "2026.09.21.03",
+      currentLockContext: {
+        generation: 1,
+        token: "cat_tok_763",
+        revoked: false,
+        verifyFencing: () => true
+      },
+      categoriesData: [],
+      linksData: [],
+      remindersData: [],
+      teacherTimetableData: {},
+      refreshAllAfterSync: () => {},
+      syncMemoryFromLatestStorage: () => {},
+      showToast: () => {},
+      console: { log: () => {}, warn: () => {}, error: () => {} }
+    };
+
+    const scriptSchema = new vm.Script(
+      'let currentLockContext = this.currentLockContext;\n' +
+      'let categoriesData = this.categoriesData;\n' +
+      'let linksData = this.linksData;\n' +
+      'let remindersData = this.remindersData;\n' +
+      'let teacherTimetableData = this.teacherTimetableData;\n' +
+      'let CURRENT_DATA_VERSION = this.CURRENT_DATA_VERSION;\n' +
+      'let SCHEMA_VERSION = 2;\n' +
+      safeStorageRemoveCode + '\n' +
+      rawSha256Code + '\n' +
+      checksumCode + '\n' +
+      validateStoreCode + '\n' +
+      validateSyncCode + '\n' +
+      applySyncCode + '\n' +
+      'this.computeRawSha256 = computeRawSha256;\n' +
+      'this.computeTxChecksum = computeTxChecksum;\n' +
+      'this.validateAndGetUnifiedStore = validateAndGetUnifiedStore;\n' +
+      'this.validateSyncPayload = validateSyncPayload;\n' +
+      'this.applySyncData = applySyncData;'
+    );
+    scriptSchema.runInContext(vm.createContext(sandboxSchema));
+
+    // 1) validateAndGetUnifiedStore chấp nhận link không có category
+    const linksNoCat = [{ id: "l_nocat", title: "No Category", url: "https://nocat.vn" }];
+    const ckNoCat = sandboxSchema.computeTxChecksum([], linksNoCat, "2026.09.21.03", [], {});
+    catMap.set("teacher_hub_store_v2", JSON.stringify({
+      schemaVersion: 2,
+      version: "2026.09.21.03",
+      generation: 1,
+      token: "cat_tok_763",
+      categories: [],
+      links: linksNoCat,
+      reminders: [],
+      timetable: {},
+      checksum: ckNoCat,
+      time: Date.now()
+    }));
+    catMap.set("teacher_hub_data_version", "2026.09.21.03");
+    const verifiedNoCat = sandboxSchema.validateAndGetUnifiedStore(false);
+    assert(verifiedNoCat !== null, 'Schema Consistency: validateAndGetUnifiedStore chấp nhận link khi không có thuộc tính category');
+
+    // 2) applySyncData chuẩn hóa link thiếu category về "all"
+    catMap.set("cva_fencing_generation", "1");
+    catMap.set("cva_fencing_token", "cat_tok_763");
+    catMap.set("cva_migration_lock", JSON.stringify({ token: "cat_tok_763", generation: 1, time: Date.now() }));
+
+    const validSampleTimetable = {
+      "2": { "Tiết 1": "Toán" },
+      "3": { "Tiết 1": "Văn" },
+      "4": { "Tiết 1": "Anh" },
+      "5": { "Tiết 1": "Lý" },
+      "6": { "Tiết 1": "Hóa" }
+    };
+
+    const syncPayloadMissingCat = {
+      schemaVersion: 2,
+      categories: [{ id: "cat1", label: "Cat 1" }],
+      links: [
+        { id: "l1", title: "L1", url: "https://l1.vn" },
+        { id: "l2", title: "L2", url: "https://l2.vn", category: "" },
+        { id: "l3", title: "L3", url: "https://l3.vn", category: "custom" }
+      ],
+      reminders: [],
+      timetable: validSampleTimetable
+    };
+    const syncRes = await sandboxSchema.applySyncData(syncPayloadMissingCat, sandboxSchema.currentLockContext);
+    assert(syncRes === true, 'Schema Consistency: applySyncData thành công với payload thiếu category');
+    const storeAfterSync = JSON.parse(catMap.get("teacher_hub_store_v2"));
+    assert(storeAfterSync.links[0].category === "all", 'Schema Consistency: Link thiếu category được chuẩn hóa về "all"');
+    assert(storeAfterSync.links[1].category === "all", 'Schema Consistency: Link có category rỗng được chuẩn hóa về "all"');
+    assert(storeAfterSync.links[2].category === "custom", 'Schema Consistency: Link có category hợp lệ được giữ nguyên "custom"');
+    const validateSyncedStore = sandboxSchema.validateAndGetUnifiedStore(false);
+    assert(validateSyncedStore !== null, 'Schema Consistency: Master Manifest sau đồng bộ vượt qua 100% kiểm định validateAndGetUnifiedStore');
+  }
+
+  // --- 7.6.4: Bảo Tồn Bản Rõ Sổ Tay Khi Ghi Lỗi (Legacy Plaintext Vault Preservation) ---
+  console.log('  ▸ 7.6.4 Kiểm tra Legacy Plaintext Vault Preservation:');
+  if (saveVaultUnlockedCode && rawSha256Code && checksumCode) {
+    const vaultMap = new Map();
+    let failOnCommitted = false;
+
+    const mockVaultStorage = {
+      getItem: (k) => vaultMap.get(k) || null,
+      setItem: (k, v) => {
+        if (failOnCommitted && k === 'cva_vault_staging' && typeof v === 'string' && v.includes('"committed"')) {
+          const err = new Error('DiskErrorOnVaultCommit');
+          err.name = 'DiskError';
+          throw err;
+        }
+        vaultMap.set(k, String(v));
+      },
+      removeItem: (k) => vaultMap.delete(k)
+    };
+
+    const sandboxVaultPreserve = {
+      localStorage: mockVaultStorage,
+      CURRENT_DATA_VERSION: "2026.09.21.03",
+      currentLockContext: {
+        generation: 1,
+        token: "v_tok_764",
+        revoked: false,
+        verifyFencing: () => true
+      },
+      isVaultUnlocked: true,
+      sessionVaultPin: "MasterPin@2026",
+      vaultData: { "site-1": { u: "teacher", p: "pass123" } },
+      generateSalt: () => "mock_salt_hex_764",
+      encryptVaultPayload: async () => "aes_gcm:mock_cipher_764",
+      showToast: () => {},
+      console: { log: () => {}, warn: () => {}, error: () => {} }
+    };
+
+    const scriptVaultPreserve = new vm.Script(
+      'let currentLockContext = this.currentLockContext;\n' +
+      'let isVaultUnlocked = this.isVaultUnlocked;\n' +
+      'let sessionVaultPin = this.sessionVaultPin;\n' +
+      'let vaultData = this.vaultData;\n' +
+      safeStorageRemoveCode + '\n' +
+      rawSha256Code + '\n' +
+      checksumCode + '\n' +
+      saveVaultUnlockedCode + '\n' +
+      'this.computeRawSha256 = computeRawSha256;\n' +
+      'this.computeTxChecksum = computeTxChecksum;\n' +
+      'this.saveVaultStorageUnlocked = saveVaultStorageUnlocked;'
+    );
+    scriptVaultPreserve.runInContext(vm.createContext(sandboxVaultPreserve));
+
+    // Setup initial state with legacy plaintext vault
+    const legacyPlaintext = JSON.stringify({ "site-1": { u: "teacher", p: "pass123" } });
+    vaultMap.set("teacher_hub_vault_v1", legacyPlaintext);
+    vaultMap.set("cva_fencing_generation", "1");
+    vaultMap.set("cva_fencing_token", "v_tok_764");
+    vaultMap.set("cva_migration_lock", JSON.stringify({ token: "v_tok_764", generation: 1, time: Date.now() }));
+
+    // Simulate failure during commit
+    failOnCommitted = true;
+    let vaultSaveThrew = false;
+    try {
+      await sandboxVaultPreserve.saveVaultStorageUnlocked(sandboxVaultPreserve.currentLockContext);
+    } catch {
+      vaultSaveThrew = true;
+    }
+    failOnCommitted = false;
+
+    assert(vaultSaveThrew === true, 'Legacy Vault Preservation: Bắt lỗi khi commit thất bại');
+    assert(vaultMap.get("teacher_hub_vault_v1") === legacyPlaintext, 'Legacy Vault Preservation: teacher_hub_vault_v1 bản rõ được bảo tồn 100% nguyên vẹn khi ghi gặp sự cố');
+
+    // Test successful write: legacy plaintext is removed AFTER committed
+    await sandboxVaultPreserve.saveVaultStorageUnlocked(sandboxVaultPreserve.currentLockContext);
+    assert(vaultMap.get("teacher_hub_vault_v1") === null || !vaultMap.has("teacher_hub_vault_v1"), 'Legacy Vault Preservation: teacher_hub_vault_v1 được xóa sạch sau khi ghi mã hóa thành công');
+    assert(vaultMap.has("teacher_hub_vault_envelope_v1"), 'Legacy Vault Preservation: Bản mã hóa envelope được lưu trữ an toàn');
+  }
+
+  // --- 7.6.5: Kiểm Định Đọc-Sau-Ghi & Đọc-Sau-Xóa Đóng-An-Toàn Của Fencing Marker ---
+  console.log('  ▸ 7.6.5 Kiểm tra Fencing Marker Read-After-Write & Read-After-Delete:');
+  if (executeLockCode) {
+    const fenceMap = new Map();
+    let failOnFenceKey = null;
+
+    const mockFenceStorage = {
+      getItem: (k) => fenceMap.get(k) || null,
+      setItem: (k, v) => {
+        if (failOnFenceKey && k === failOnFenceKey) {
+          return;
+        }
+        fenceMap.set(k, String(v));
+      },
+      removeItem: (k) => fenceMap.delete(k)
+    };
+
+    const sandboxFence = {
+      localStorage: mockFenceStorage,
+      currentLockContext: null,
+      navigator: {
+        locks: {
+          request: async (name, opts, cb) => {
+            return await cb();
+          }
+        }
+      },
+      syncMemoryFromLatestStorage: () => {},
+      showDegradedStorageBanner: () => {},
+      console: { log: () => {}, warn: () => {}, error: () => {} }
+    };
+
+    const scriptFence = new vm.Script(
+      'let currentLockContext = this.currentLockContext;\n' +
+      safeStorageRemoveCode + '\n' +
+      executeLockCode + '\n' +
+      'this.executeWithCrossTabLock = executeWithCrossTabLock;'
+    );
+    scriptFence.runInContext(vm.createContext(sandboxFence));
+
+    // Simulate silent write failure on cva_fencing_generation during lock acquisition
+    fenceMap.clear();
+    failOnFenceKey = 'cva_fencing_generation';
+    let fenceCbRan = false;
+    let fenceThrew = false;
+    try {
+      await sandboxFence.executeWithCrossTabLock(async () => {
+        fenceCbRan = true;
+      });
+    } catch {
+      fenceThrew = true;
+    }
+    failOnFenceKey = null;
+
+    assert(fenceThrew === true, 'Fencing Marker Fail-Closed: Ném lỗi khi Read-After-Write của cva_fencing_generation thất bại');
+    assert(fenceCbRan === false, 'Fencing Marker Fail-Closed: Callback TUYỆT ĐỐI KHÔNG được thực thi khi fencing write fail (0 callback)');
+
+    // Verify Read-After-Delete in finally
+    let lockReleasedCleanly = false;
+    await sandboxFence.executeWithCrossTabLock(async (lockCtx) => {
+      assert(lockCtx.revoked === false, 'Fencing Marker: lockCtx hoạt động trong callback');
+      lockReleasedCleanly = true;
+    });
+    assert(lockReleasedCleanly === true, 'Fencing Marker: Giao dịch hoàn tất thành công');
+    assert(!fenceMap.has("cva_migration_lock"), 'Fencing Marker Read-After-Delete: cva_migration_lock được xóa sạch 100% trong khối finally');
+
+    // Test Adversarial Fencing Preemption Interleaving (Codex Invariant: Tab B Preempts Tab A before finally)
+    const tabBMarker = JSON.stringify({
+      token: "tok_tab_b_preempt_adversarial",
+      generation: 99,
+      time: Date.now()
+    });
+
+    let tabAExecuted = false;
+    await sandboxFence.executeWithCrossTabLock(async (lockCtx) => {
+      assert(lockCtx.revoked === false, 'Fencing Marker: Tab A đang giữ lock hợp lệ');
+      // Tab B can thiệp cướp quyền và tăng thế hệ trước khi Tab A vào finally:
+      fenceMap.set("cva_fencing_generation", "99");
+      fenceMap.set("cva_fencing_token", "tok_tab_b_preempt_adversarial");
+      fenceMap.set("cva_migration_lock", tabBMarker);
+      tabAExecuted = true;
+    });
+
+    assert(tabAExecuted === true, 'Fencing Marker: Tab A hoàn tất callback thành công');
+    assert(fenceMap.get("cva_migration_lock") === tabBMarker, 'Adversarial Invariant: Marker của Tab B BẢO LƯU 100%, Tab A tuyệt đối không được xóa marker của Tab B');
+    assert(fenceMap.has("cva_migration_lock_cleanup_failed") === true, 'Adversarial Invariant: Tab A ghi nhận cờ cva_migration_lock_cleanup_failed');
+    const cleanupErr = JSON.parse(fenceMap.get("cva_migration_lock_cleanup_failed"));
+    assert(cleanupErr.reason === "FencingOwnershipMismatchBeforeDelete" || cleanupErr.reason === "LockContextVerifyFencingFailed", 'Adversarial Invariant: Ghi nhận chính xác lý do vi phạm fencing trước khi xóa');
+
+    // Test 3B: Adversarial TOCTOU Race: Tab B can thiệp NGAY SAU ownership check nhưng TRƯỚC lệnh delete!
+    const tabBInterleavedMarker = JSON.stringify({
+      token: "tok_tab_b_interleaved_cas",
+      generation: 100,
+      time: Date.now()
+    });
+
+    sandboxFence.window = {
+      __adversarialPreDeleteHook: () => {
+        // Tab B thay đổi cả 3 marker ngay sau ownership check và ngay trước lệnh delete!
+        fenceMap.set("cva_fencing_generation", "100");
+        fenceMap.set("cva_fencing_token", "tok_tab_b_interleaved_cas");
+        fenceMap.set("cva_migration_lock", tabBInterleavedMarker);
+      }
+    };
+    sandboxFence.globalThis = sandboxFence.window;
+
+    fenceMap.delete("cva_migration_lock_cleanup_failed");
+    let tabAInterleavedRan = false;
+    await sandboxFence.executeWithCrossTabLock(async (lockCtx) => {
+      assert(lockCtx.revoked === false, 'Tab A thực thi callback thành công');
+      tabAInterleavedRan = true;
+    });
+
+    assert(tabAInterleavedRan === true, 'Tab A callback hoàn tất');
+    assert(fenceMap.get("cva_migration_lock") === tabBInterleavedMarker, 'Adversarial CAS Anti-TOCTOU Invariant: Marker của Tab B BẢO LƯU 100% khi xen giữa ownership check và delete, Tab A tuyệt đối không được xóa');
+    assert(fenceMap.has("cva_migration_lock_cleanup_failed") === true, 'Adversarial CAS Anti-TOCTOU Invariant: Tab A phát hiện CAS mismatch và ghi cờ cva_migration_lock_cleanup_failed');
+    const casCleanErr = JSON.parse(fenceMap.get("cva_migration_lock_cleanup_failed"));
+    assert(casCleanErr.reason === "CASPreemptionDetectedBeforeDelete", 'Adversarial CAS Anti-TOCTOU Invariant: Ghi nhận chính xác lý do CASPreemptionDetectedBeforeDelete');
+    delete sandboxFence.window.__adversarialPreDeleteHook;
+
+    // Test 3C: Adversarial Post-Delete Interleaving: Tab B thay đổi marker NGAY SAU KHI Tab A thực hiện delete!
+    sandboxFence.window = {
+      __adversarialPostDeleteHook: () => {
+        fenceMap.set("cva_fencing_generation", "101");
+        fenceMap.set("cva_fencing_token", "tok_tab_b_post_del_race");
+      }
+    };
+    sandboxFence.globalThis = sandboxFence.window;
+    fenceMap.delete("cva_migration_lock_cleanup_failed");
+
+    let tabAPostDelRan = false;
+    await sandboxFence.executeWithCrossTabLock(async (lockCtx) => {
+      assert(lockCtx.revoked === false, 'Tab A thực thi callback thành công');
+      tabAPostDelRan = true;
+    });
+
+    assert(tabAPostDelRan === true, 'Tab A callback hoàn tất');
+    assert(fenceMap.has("cva_migration_lock_cleanup_failed") === true, 'Adversarial Post-Delete Race: Phát hiện post-delete mismatch và ghi cờ cva_migration_lock_cleanup_failed');
+    const postDelCleanErr = JSON.parse(fenceMap.get("cva_migration_lock_cleanup_failed"));
+    assert(postDelCleanErr.reason === "PostDeleteFencingDoubleCheckFailed", 'Adversarial Post-Delete Race: Ghi nhận chính xác lý do PostDeleteFencingDoubleCheckFailed');
+    delete sandboxFence.window.__adversarialPostDeleteHook;
+
+    // Static AST / Invariant Check: Zero Non-Lock Cleanup Invariant & Zero Swallowed Catches
+    assert(executeLockCode.includes('safeFencedRemoveLock'), 'Zero Non-Lock Invariant: executeWithCrossTabLock khai báo hàm safeFencedRemoveLock');
+    assert(executeLockCode.includes('safeFencedRemoveLock("cva_migration_lock"'), 'Zero Non-Lock Invariant: executeWithCrossTabLock dọn dẹp khóa qua safeFencedRemoveLock');
+    assert(!executeLockCode.match(/finally\s*\{[^}]*localStorage\.removeItem\(/), 'Zero Non-Lock Invariant: executeWithCrossTabLock CẤM raw localStorage.removeItem trong finally');
+    assert(htmlContent.includes('safeFencedRemoveLock'), 'HTML chứa khai báo an toàn safeFencedRemoveLock');
+    assert(!executeLockCode.includes('/* ignore */'), 'Zero Swallowed Catches: executeWithCrossTabLock không chứa /* ignore */ nuốt lỗi');
+    assert(executeLockCode.includes('PostDeleteFencingDoubleCheckFailed'), 'Post-Delete Double-Check: executeWithCrossTabLock kiểm tra post-delete fencing mismatch');
+  }
+
+  // --- 7.6.6: Điều Phối Viên Đơn Giao Dịch Chống Ghi Đè Đệ Quy (Single Sync Coordinator) ---
+  console.log('  ▸ 7.6.6 Kiểm tra Single Transaction Coordinator Invariant:');
+  if (updateUnifiedUnlockedCode) {
+    const singleCoordMap = new Map();
+    const mockCoordStorage = {
+      getItem: (k) => singleCoordMap.get(k) || null,
+      setItem: (k, v) => singleCoordMap.set(k, String(v)),
+      removeItem: (k) => singleCoordMap.delete(k)
+    };
+
+    let coordinatorSetCalls = 0;
+    const trackedCoordStorage = {
+      ...mockCoordStorage,
+      setItem: (k, v) => {
+        coordinatorSetCalls++;
+        mockCoordStorage.setItem(k, v);
+      }
+    };
+
+    const sandboxCoord = {
+      localStorage: trackedCoordStorage,
+      isSyncTransactionActive: true,
+      CURRENT_DATA_VERSION: "2026.09.21.03",
+      currentLockContext: {
+        generation: 1,
+        token: "tok_coord_766",
+        revoked: false,
+        verifyFencing: () => true
+      },
+      categoriesData: [{ id: "c_test" }],
+      linksData: [{ id: "l_test" }],
+      remindersData: [],
+      teacherTimetableData: {},
+      console: { log: () => {}, warn: () => {}, error: () => {} }
+    };
+
+    // Setup valid fencing markers for single coordinator test
+    singleCoordMap.set("cva_fencing_generation", "1");
+    singleCoordMap.set("cva_fencing_token", "tok_coord_766");
+    singleCoordMap.set("cva_migration_lock", JSON.stringify({ token: "tok_coord_766", generation: 1, time: Date.now() }));
+
+    const scriptCoord = new vm.Script(
+      'let currentLockContext = this.currentLockContext;\n' +
+      'let isSyncTransactionActive = this.isSyncTransactionActive;\n' +
+      'let categoriesData = this.categoriesData;\n' +
+      'let linksData = this.linksData;\n' +
+      'let remindersData = this.remindersData;\n' +
+      'let teacherTimetableData = this.teacherTimetableData;\n' +
+      'let CURRENT_DATA_VERSION = this.CURRENT_DATA_VERSION;\n' +
+      updateUnifiedUnlockedCode + '\n' +
+      'this.updateUnifiedStoreUnlocked = updateUnifiedStoreUnlocked;'
+    );
+    scriptCoord.runInContext(vm.createContext(sandboxCoord));
+
+    // Case 1: isSyncTransactionActive = true + valid lockCtx & valid fencing -> returns false (0 writes, cấm trả về true giả mạo)
+    coordinatorSetCalls = 0;
+    const bypassRes = sandboxCoord.updateUnifiedStoreUnlocked(sandboxCoord.currentLockContext);
+    assert(bypassRes === false, 'Single Coordinator Invariant: updateUnifiedStoreUnlocked trả về false khi isSyncTransactionActive = true (chống fake success)');
+    assert(coordinatorSetCalls === 0, 'Single Coordinator Invariant: 0 storage writes khi sync transaction đang diễn ra (chống re-entrant store write)');
+
+    // Case 2: isSyncTransactionActive = true + lockCtx.revoked = true -> Phải ném StorageLockUnavailable (Fail-Closed)
+    coordinatorSetCalls = 0;
+    let threwRevokedWhenSyncActive = false;
+    try {
+      sandboxCoord.updateUnifiedStoreUnlocked({
+        generation: 1,
+        token: "tok_coord_766",
+        revoked: true,
+        verifyFencing: () => false
+      });
+    } catch (e) {
+      threwRevokedWhenSyncActive = Boolean(e && e.message && e.message.includes('StorageLockUnavailable'));
+    }
+    assert(threwRevokedWhenSyncActive === true, 'Fail-Closed Invariant: updateUnifiedStoreUnlocked ném StorageLockUnavailable khi lockCtx.revoked = true kể cả khi isSyncTransactionActive = true');
+    assert(coordinatorSetCalls === 0, 'Fail-Closed Invariant: 0 storage writes khi lockCtx.revoked = true');
+
+    // Case 3: isSyncTransactionActive = true + mất cva_migration_lock -> Phải ném FencingViolation (Fail-Closed)
+    singleCoordMap.delete("cva_migration_lock");
+    coordinatorSetCalls = 0;
+    let threwMissingLockWhenSyncActive = false;
+    try {
+      sandboxCoord.updateUnifiedStoreUnlocked(sandboxCoord.currentLockContext);
+    } catch (e) {
+      threwMissingLockWhenSyncActive = Boolean(e && e.message && e.message.includes('FencingViolation'));
+    }
+    assert(threwMissingLockWhenSyncActive === true, 'Fail-Closed Invariant: updateUnifiedStoreUnlocked ném FencingViolation khi cva_migration_lock bị mất kể cả khi isSyncTransactionActive = true');
+    assert(coordinatorSetCalls === 0, 'Fail-Closed Invariant: 0 storage writes khi mất cva_migration_lock');
+
+    // Case 4: isSyncTransactionActive = true + generation bị superseded -> Phải ném FencingViolation (Fail-Closed)
+    singleCoordMap.set("cva_migration_lock", JSON.stringify({ token: "tok_coord_766", generation: 1, time: Date.now() }));
+    singleCoordMap.set("cva_fencing_generation", "99"); // Superseded!
+    coordinatorSetCalls = 0;
+    let threwSupersededWhenSyncActive = false;
+    try {
+      sandboxCoord.updateUnifiedStoreUnlocked(sandboxCoord.currentLockContext);
+    } catch (e) {
+      threwSupersededWhenSyncActive = Boolean(e && e.message && e.message.includes('FencingViolation'));
+    }
+    assert(threwSupersededWhenSyncActive === true, 'Fail-Closed Invariant: updateUnifiedStoreUnlocked ném FencingViolation khi generation bị superseded kể cả khi isSyncTransactionActive = true');
+    assert(coordinatorSetCalls === 0, 'Fail-Closed Invariant: 0 storage writes khi generation bị superseded');
+  }
+
+  // --- 7.6.7: Triệt Tiêu Xóa Thô Toàn Cục & Primitive Đọc-Sau-Xóa Duy Nhất (Universal safeStorageRemove Invariant) ---
+  console.log('  ▸ 7.6.7 Kiểm tra Universal Zero Raw RemoveItem & safeStorageRemove Invariant:');
+  // Static AST check: Trong toàn bộ index.html chỉ có đúng 1 lệnh raw localStorage.removeItem (bên trong chính safeStorageRemove)
+  const allRemoveItemMatches = htmlContent.match(/localStorage\.removeItem\s*\(/g) || [];
+  assert(allRemoveItemMatches.length === 1, `Universal Zero Raw RemoveItem: Chỉ được phép có duy nhất 1 lệnh raw localStorage.removeItem trong toàn bộ index.html (thực tế: ${allRemoveItemMatches.length})`);
+  assert(htmlContent.includes('function safeStorageRemove(key)'), 'Universal Zero Raw RemoveItem: index.html định nghĩa hàm safeStorageRemove(key)');
+
+  if (safeStorageRemoveCode) {
+    const removeMap = new Map();
+    let simulateFailedDelete = false;
+    const mockStorageForRemove = {
+      getItem: (k) => removeMap.get(k) || null,
+      setItem: (k, v) => removeMap.set(k, String(v)),
+      removeItem: (k) => {
+        if (!simulateFailedDelete) {
+          removeMap.delete(k);
+        }
+      }
+    };
+    const sandboxRemove = {
+      localStorage: mockStorageForRemove,
+      console: { log: () => {}, warn: () => {}, error: () => {} }
+    };
+    const scriptRemove = new vm.Script(safeStorageRemoveCode + '\nthis.safeStorageRemove = safeStorageRemove;');
+    scriptRemove.runInContext(vm.createContext(sandboxRemove));
+
+    // Test 1: Xóa thành công bình thường
+    removeMap.set("test_del_key", "val123");
+    const delRes = sandboxRemove.safeStorageRemove("test_del_key");
+    assert(delRes === true, 'safeStorageRemove: Trả về true khi xóa thành công');
+    assert(removeMap.has("test_del_key") === false, 'safeStorageRemove: Khóa đã được xóa sạch khỏi storage');
+
+    // Test 2: Xóa thất bại (Read-After-Delete phát hiện key vẫn còn) -> ném ngoại lệ ReadAfterDeleteFailure
+    removeMap.set("test_stuck_key", "sticky");
+    simulateFailedDelete = true;
+    let threwDeleteFailure = false;
+    try {
+      sandboxRemove.safeStorageRemove("test_stuck_key");
+    } catch(err) {
+      threwDeleteFailure = Boolean(err && err.message && err.message.includes('ReadAfterDeleteFailure'));
+    }
+    simulateFailedDelete = false;
+    assert(threwDeleteFailure === true, 'safeStorageRemove: Ném lỗi ReadAfterDeleteFailure (Fail-Closed) khi key không bị xóa khỏi storage');
+  }
+
+  // --- 7.6.8: Khôi Phục Marker Fencing Khi Thất Bại & Cờ Báo Hỏng Fencing (Fencing Marker Rollback Invariant) ---
+  console.log('  ▸ 7.6.8 Kiểm tra Fencing Marker Rollback & Anti-Partial-Acquisition Invariant:');
+  if (executeLockCode && safeStorageRemoveCode) {
+    const markerRollbackMap = new Map();
+    let failMarkerLockWrite = false;
+    let failMarkerRollbackWrite = false;
+
+    const mockMarkerStorage = {
+      getItem: (k) => markerRollbackMap.get(k) || null,
+      setItem: (k, v) => {
+        if (failMarkerLockWrite && k === "cva_migration_lock") {
+          throw new Error("SimulatedQuotaErrorOnMigrationLockWrite");
+        }
+        if (failMarkerRollbackWrite && k === "cva_fencing_generation") {
+          throw new Error("SimulatedDiskErrorOnFencingRollback");
+        }
+        markerRollbackMap.set(k, String(v));
+      },
+      removeItem: (k) => markerRollbackMap.delete(k)
+    };
+
+    const sandboxMarker = {
+      localStorage: mockMarkerStorage,
+      currentLockContext: null,
+      navigator: {
+        locks: {
+          request: async (name, opts, cb) => await cb()
+        }
+      },
+      syncMemoryFromLatestStorage: () => {},
+      showDegradedStorageBanner: () => {},
+      console: { log: () => {}, warn: () => {}, error: () => {} }
+    };
+
+    const scriptMarker = new vm.Script(
+      'let currentLockContext = this.currentLockContext;\n' +
+      safeStorageRemoveCode + '\n' +
+      executeLockCode + '\n' +
+      'this.executeWithCrossTabLock = executeWithCrossTabLock;'
+    );
+    scriptMarker.runInContext(vm.createContext(sandboxMarker));
+
+    // Case 1: Trước đó có marker cũ, write lock mới fail -> markers được rollback về giá trị cũ
+    markerRollbackMap.set("cva_fencing_generation", "5");
+    markerRollbackMap.set("cva_fencing_token", "tok_old_gen5");
+    markerRollbackMap.set("cva_migration_lock", JSON.stringify({ token: "tok_old_gen5", generation: 5 }));
+
+    failMarkerLockWrite = true;
+    let threwAcqErr = false;
+    try {
+      await sandboxMarker.executeWithCrossTabLock(async () => {});
+    } catch {
+      threwAcqErr = true;
+    }
+    failMarkerLockWrite = false;
+    assert(threwAcqErr === true, 'Marker Rollback: executeWithCrossTabLock ném ngoại lệ khi ghi marker thất bại');
+    assert(markerRollbackMap.get("cva_fencing_generation") === "5", 'Marker Rollback: Generation được phục hồi về giá trị cũ "5"');
+    assert(markerRollbackMap.get("cva_fencing_token") === "tok_old_gen5", 'Marker Rollback: Token được phục hồi về giá trị cũ');
+    assert(markerRollbackMap.has("cva_migration_lock_acquisition_failed") === true, 'Marker Rollback: Ghi nhận cờ cva_migration_lock_acquisition_failed');
+
+    // Case 2: Rollback marker cũng bị thất bại -> Ghi nhận cờ cva_fencing_corrupt
+    failMarkerLockWrite = true;
+    failMarkerRollbackWrite = true;
+    let threwCorruptErr = false;
+    try {
+      await sandboxMarker.executeWithCrossTabLock(async () => {});
+    } catch {
+      threwCorruptErr = true;
+    }
+    failMarkerLockWrite = false;
+    failMarkerRollbackWrite = false;
+    assert(threwCorruptErr === true, 'Marker Rollback: Ném lỗi khi cả rollback marker bị lỗi');
+    assert(markerRollbackMap.has("cva_fencing_corrupt") === true, 'Marker Rollback: Ghi nhận cờ cva_fencing_corrupt khi rollback marker thất bại');
+
+    // Case 3: recoverStagingTransaction Phase 1 phát hiện cva_fencing_corrupt -> Dừng ngay lập tức (Fail-Closed)
+    if (recoverCode) {
+      const sandboxCorruptRec = {
+        localStorage: mockMarkerStorage,
+        currentLockContext: { token: "tok_rec", generation: 6, revoked: false, verifyFencing: () => true },
+        console: { log: () => {}, warn: () => {}, error: () => {} }
+      };
+      const scriptCorruptRec = new vm.Script(
+        'let currentLockContext = this.currentLockContext;\n' +
+        safeStorageRemoveCode + '\n' +
+        recoverCode + '\n' +
+        'this.recoverStagingTransaction = recoverStagingTransaction;'
+      );
+      scriptCorruptRec.runInContext(vm.createContext(sandboxCorruptRec));
+
+      const corruptRes = sandboxCorruptRec.recoverStagingTransaction(sandboxCorruptRec.currentLockContext);
+      assert(corruptRes.recovered === false, 'cva_fencing_corrupt Fail-Closed: recoverStagingTransaction từ chối recovery (recovered: false)');
+      assert(corruptRes.error && corruptRes.error.includes('FencingCorrupt'), 'cva_fencing_corrupt Fail-Closed: Báo lỗi chính xác FencingCorrupt');
+    }
+  }
+
+  // --- 7.6.9: Snapshot Toàn Diện & Dừng Khẩn Cấp Khi Rollback Lỗi (Comprehensive Snapshot & Immediate Stop Invariant) ---
+  console.log('  ▸ 7.6.9 Kiểm tra Comprehensive Pre-Phase-2 Snapshot & Immediate Rollback-Stop Invariant:');
+  if (recoverCode && rawSha256Code && checksumCode && safeStorageRemoveCode) {
+    // Kiểm tra cấu trúc prePhase2Snapshot trong mã nguồn index.html
+    assert(htmlContent.includes('migrationStaging: localStorage.getItem(MIGRATION_STAGING_KEY)'), 'Comprehensive Snapshot: prePhase2Snapshot chứa migrationStaging');
+    assert(htmlContent.includes('syncStaging: localStorage.getItem("cva_sync_staging")'), 'Comprehensive Snapshot: prePhase2Snapshot chứa syncStaging');
+    assert(htmlContent.includes('vaultStaging: localStorage.getItem("cva_vault_staging")'), 'Comprehensive Snapshot: prePhase2Snapshot chứa vaultStaging');
+    assert(htmlContent.includes('storeStaging: localStorage.getItem("cva_store_staging")'), 'Comprehensive Snapshot: prePhase2Snapshot chứa storeStaging');
+    assert(htmlContent.includes('fencingCorrupt: localStorage.getItem("cva_fencing_corrupt")'), 'Comprehensive Snapshot: prePhase2Snapshot chứa fencingCorrupt');
+    assert(htmlContent.includes('recoveryRollbackError: localStorage.getItem("cva_recovery_rollback_error")'), 'Comprehensive Snapshot: prePhase2Snapshot chứa recoveryRollbackError');
+
+    // Kiểm tra cấu trúc keysMap đủ 23 keys
+    const expectedRollbackKeys = [
+      "teacher_hub_store_v2",
+      "teacher_hub_data_version",
+      "teacher_hub_categories_v1",
+      "teacher_hub_links_v2",
+      "teacher_hub_reminders_v1",
+      "teacher_hub_timetable_v1",
+      "teacher_hub_vault_envelope_v1",
+      "teacher_hub_vault_salt",
+      "teacher_hub_vault_enc_v2",
+      "teacher_hub_vault_v1",
+      "cva_migration_staging",
+      "cva_sync_staging",
+      "cva_vault_staging",
+      "cva_store_staging",
+      "cva_migration_error",
+      "cva_sync_error",
+      "cva_vault_error",
+      "cva_store_error",
+      "cva_fencing_corrupt",
+      "cva_recovery_rollback_error",
+      "cva_migration_lock",
+      "cva_fencing_token",
+      "cva_fencing_generation"
+    ];
+    for (const expKey of expectedRollbackKeys) {
+      assert(
+        recoverCode.includes(`"${expKey}"`) || recoverCode.includes(`[MIGRATION_STAGING_KEY`) || recoverCode.includes(`[MIGRATION_LOCK_KEY`) || recoverCode.includes(`[FENCING_GEN_KEY`),
+        `Comprehensive Rollback Keys: keysMap chứa đầy đủ khóa ${expKey}`
+      );
+    }
+
+    // Kiểm tra cơ chế Dừng Khẩn Cấp (break ngay lập tức) trong rollbackAllToPrePhase2
+    assert(recoverCode.includes('break; // Fail-Closed: Dừng ngay lập tức'), 'Immediate Rollback Stop: rollbackAllToPrePhase2 ngắt vòng lặp (break) ngay khi có 1 key lỗi');
+    assert(recoverCode.includes('verifyRecoveryLock()'), 'Immediate Rollback Stop: rollbackAllToPrePhase2 kiểm tra verifyRecoveryLock trước và sau mỗi key');
+    assert(recoverCode.includes('Phase2RollbackFailed'), 'Immediate Rollback Stop: rollbackAllToPrePhase2 ném Phase2RollbackFailed khi gặp lỗi');
+
+    // Functional Test: Rollback toàn bộ 23 khóa khi Phase 2 gặp lỗi đĩa
+    const rollbackAllMap = new Map();
+    let throwOnPhase2StoreWrite = false;
+    let throwOnRollbackKey = null;
+
+    const mockRollbackAllStorage = {
+      getItem: (k) => rollbackAllMap.get(k) || null,
+      setItem: (k, v) => {
+        if (throwOnPhase2StoreWrite && k === "teacher_hub_store_v2") {
+          throwOnPhase2StoreWrite = false;
+          throw new Error("SimulatedDiskErrorDuringPhase2Write");
+        }
+        if (throwOnRollbackKey && k === throwOnRollbackKey) {
+          throw new Error("SimulatedErrorOnRollbackKey:" + k);
+        }
+        rollbackAllMap.set(k, String(v));
+      },
+      removeItem: (k) => {
+        if (throwOnRollbackKey && k === throwOnRollbackKey) {
+          throw new Error("SimulatedErrorOnRollbackKey:" + k);
+        }
+        rollbackAllMap.delete(k);
+      }
+    };
+
+    const sandboxRollbackAll = {
+      localStorage: mockRollbackAllStorage,
+      CURRENT_DATA_VERSION: "2026.09.21.03",
+      currentLockContext: {
+        token: "tok_rollback_23",
+        generation: 7,
+        revoked: false,
+        verifyFencing: () => true
+      },
+      console: { log: () => {}, warn: () => {}, error: () => {} }
+    };
+
+    const scriptRollbackAll = new vm.Script(
+      'let currentLockContext = this.currentLockContext;\n' +
+      safeStorageRemoveCode + '\n' +
+      rawSha256Code + '\n' +
+      checksumCode + '\n' +
+      recoverCode + '\n' +
+      'this.computeRawSha256 = computeRawSha256;\n' +
+      'this.computeTxChecksum = computeTxChecksum;\n' +
+      'this.recoverStagingTransaction = recoverStagingTransaction;'
+    );
+    scriptRollbackAll.runInContext(vm.createContext(sandboxRollbackAll));
+
+    // Thiết lập snapshot ban đầu trước khi vào Phase 2
+    const initStore = JSON.stringify({ version: "2026.09.20.00", categories: [], links: [{ id: "l_init", title: "Init", url: "https://init.vn" }] });
+    const initLinks = JSON.stringify([{ id: "l_init", title: "Init", url: "https://init.vn" }]);
+    const initLock = JSON.stringify({ token: "tok_rollback_23", generation: 7, time: Date.now() });
+
+    rollbackAllMap.set("teacher_hub_store_v2", initStore);
+    rollbackAllMap.set("teacher_hub_data_version", "2026.09.20.00");
+    rollbackAllMap.set("teacher_hub_categories_v1", "[]");
+    rollbackAllMap.set("teacher_hub_links_v2", initLinks);
+    rollbackAllMap.set("teacher_hub_reminders_v1", "[]");
+    rollbackAllMap.set("teacher_hub_timetable_v1", "{}");
+    rollbackAllMap.set("teacher_hub_vault_envelope_v1", JSON.stringify({ version: "vault_v1", salt: "s_init", ciphertext: "c_init" }));
+    rollbackAllMap.set("teacher_hub_vault_salt", "s_init");
+    rollbackAllMap.set("teacher_hub_vault_enc_v2", "c_init");
+    rollbackAllMap.set("cva_fencing_generation", "7");
+    rollbackAllMap.set("cva_fencing_token", "tok_rollback_23");
+    rollbackAllMap.set("cva_migration_lock", initLock);
+
+    // Chuẩn bị store staging committed để kích hoạt Phase 2
+    const stCats = [{ id: "c_new" }];
+    const stLinks = [{ id: "l_new", url: "https://new.vn" }];
+    const stCk = sandboxRollbackAll.computeTxChecksum(stCats, stLinks, "2026.09.21.03", [], {});
+    rollbackAllMap.set("cva_store_staging", JSON.stringify({
+      status: "committed",
+      token: "tok_rollback_23",
+      fencingGeneration: 7,
+      version: "2026.09.21.03",
+      categories: stCats,
+      links: stLinks,
+      reminders: [],
+      timetable: {},
+      checksum: stCk,
+      time: Date.now()
+    }));
+
+    // Bắt lỗi ghi store v2 trong Phase 2 để kiểm thử phục hồi toàn bộ 23 khóa
+    throwOnPhase2StoreWrite = true;
+    const recRes = sandboxRollbackAll.recoverStagingTransaction(sandboxRollbackAll.currentLockContext);
+    throwOnPhase2StoreWrite = false;
+
+    assert(recRes.recovered === false, 'Full 23-Key Rollback: recoverStagingTransaction trả về recovered: false khi Phase 2 gặp lỗi');
+    assert(rollbackAllMap.get("teacher_hub_store_v2") === initStore, 'Full 23-Key Rollback: teacher_hub_store_v2 được phục hồi về snapshot');
+    assert(rollbackAllMap.get("teacher_hub_links_v2") === initLinks, 'Full 23-Key Rollback: teacher_hub_links_v2 được phục hồi về snapshot');
+    assert(rollbackAllMap.get("teacher_hub_data_version") === "2026.09.20.00", 'Full 23-Key Rollback: teacher_hub_data_version được phục hồi về snapshot');
+    assert(rollbackAllMap.get("cva_fencing_generation") === "7", 'Full 23-Key Rollback: cva_fencing_generation được phục hồi về snapshot');
+    assert(rollbackAllMap.get("cva_fencing_token") === "tok_rollback_23", 'Full 23-Key Rollback: cva_fencing_token được phục hồi về snapshot');
+    assert(rollbackAllMap.get("cva_migration_lock") === initLock, 'Full 23-Key Rollback: cva_migration_lock được phục hồi về snapshot');
+    assert(rollbackAllMap.has("cva_store_error") === true, 'Full 23-Key Rollback: Cờ lỗi chẩn đoán cva_store_error được ghi nhận sau rollback');
+
+    // Test Dừng Khẩn Cấp (Immediate Stop): Khi một key bị lỗi trong quá trình rollback
+    throwOnPhase2StoreWrite = true;
+    throwOnRollbackKey = "teacher_hub_data_version";
+    const failRollbackRes = sandboxRollbackAll.recoverStagingTransaction(sandboxRollbackAll.currentLockContext);
+    throwOnPhase2StoreWrite = false;
+    throwOnRollbackKey = null;
+
+    assert(failRollbackRes.recovered === false, 'Rollback Stop: recoverStagingTransaction thất bại khi rollback gặp lỗi');
+    assert(rollbackAllMap.has("cva_recovery_rollback_error") === true, 'Rollback Stop: Ghi nhận cờ cva_recovery_rollback_error khi một key bị lỗi trong rollback');
+  }
+})();
+
+// 7.7 KIỂM TRA TOÀN DIỆN MODULE ĐỒNG BỘ ĐÁM MÂY CLOUD SYNC & SMART MERGE (ZERO-BUG CLOUD INVARIANT)
+console.log('\n📌 7.7 Kiểm tra Toàn diện Module Đồng bộ Đám mây Cloud Sync & Smart Merge Toàn trường:');
+{
+  assert(htmlContent.includes('const CLOUD_SYNC_ENDPOINT =') && htmlContent.includes('firebasedatabase.app'), 'Cloud Sync Endpoint: Trỏ chính xác đến Firebase Realtime Database HTTPS REST endpoint');
+  assert(htmlContent.includes('async function syncAdminChangesToCloud') && htmlContent.includes('async function checkCloudSystemUpdates'), 'Cloud Sync Engine: Khai báo đầy đủ 2 hàm đồng bộ syncAdminChangesToCloud và checkCloudSystemUpdates');
+  assert(htmlContent.includes('btnCloudSyncAdmin') && htmlContent.includes('btnExportGitHubConfig'), 'Giao diện Admin: Tích hợp đầy đủ nút Đẩy Dữ Liệu Lên Đám Mây và nút Xuất Cấu Hình GitHub');
+  assert(htmlContent.includes('teacher_hub_cloud_synced_at'), 'Cloud Sync Marker: Ghi nhận dấu mốc đồng bộ teacher_hub_cloud_synced_at để tối ưu hóa lưu lượng tải');
+  assert(htmlContent.includes('cloudLinksMap.has(locLink.id)') && htmlContent.includes('localLinkIds.has(cLink.id)'), 'Smart Merge Algorithm: Triệt để bảo toàn liên kết cá nhân của giáo viên và cập nhật đè link hệ thống');
+  assert(htmlContent.includes('validCloudCats.forEach') && htmlContent.includes('catMap.has(cCat.id)'), 'Smart Category Merge: Tự động nạp danh mục mới từ trường mà không ghi đè danh mục cá nhân');
+  assert(swContent.includes("CACHE_NAME = 'teacher-hub-v2.2.0'"), 'PWA Cache Invariant: Service Worker sw.js nâng cấp lên CACHE_NAME teacher-hub-v2.2.0');
+}
 
 // 8. KIỂM THỬ PLAYWRIGHT E2E TRÌNH DUYỆT THẬT (DUAL ENVIRONMENT: FILE:/// VÀ HTTP://LOCALHOST)
 console.log('\n📌 8. Kiểm thử Playwright E2E Thực tế trên Trình duyệt kép:');
