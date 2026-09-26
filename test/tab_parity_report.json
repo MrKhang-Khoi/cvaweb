@@ -1,0 +1,151 @@
+[
+  {
+    "index": 1,
+    "id": "all",
+    "name": "🌐 Tất cả",
+    "desktopCount": 30,
+    "mobileCount": 30,
+    "matched": true,
+    "titles": [
+      "Quảng lý CCVC Quảng Ngãi",
+      "Ký số",
+      "Thời khóa biểu",
+      "Cơ Sở Dữ Liệu Ngành GD&ĐT",
+      "vnEdu - Mạng Giáo Dục",
+      "SMAS - Viettel Edu",
+      "Nền Tảng K12Online",
+      "Kho Học Liệu Số iGiaoDuc",
+      "Thư Viện Bài Giảng Violet",
+      "Học Trực Tuyến OLM.VN",
+      "Hành Trang Số - NXBGD",
+      "Sách Cánh Diều - Hoc10",
+      "Canva Giáo Dục - Thiết Kế",
+      "Quizizz - Trò Chơi Ôn Tập",
+      "Kahoot! - Đấu Trường Trí Tuệ",
+      "ChatGPT Trợ Lý Giáo Viên",
+      "PhET Thí Nghiệm Ảo",
+      "Google Classroom",
+      "Padlet - Bảng Tương Tác",
+      "Ký số",
+      "Thời khóa biểu",
+      "CSDL Ngành Giáo Dục",
+      "TEMIS - Đánh Giá Chuẩn",
+      "Tập Huấn Giáo Viên GDPT",
+      "VietJack - Giáo Án & Đề",
+      "Azota - Tạo Đề & Chấm Thi",
+      "Cổng Thông Tin Bộ GD&ĐT",
+      "Thư Viện Pháp Luật Giáo Dục",
+      "Báo Giáo Dục & Thời Đại",
+      "Cổng Dịch Vụ Công Quốc Gia"
+    ]
+  },
+  {
+    "index": 2,
+    "id": "fav",
+    "name": "⭐ Yêu thích ⭐",
+    "desktopCount": 9,
+    "mobileCount": 9,
+    "matched": true,
+    "titles": [
+      "Quảng lý CCVC Quảng Ngãi",
+      "Cơ Sở Dữ Liệu Ngành GD&ĐT",
+      "vnEdu - Mạng Giáo Dục",
+      "SMAS - Viettel Edu",
+      "Kho Học Liệu Số iGiaoDuc",
+      "Hành Trang Số - NXBGD",
+      "Canva Giáo Dục - Thiết Kế",
+      "ChatGPT Trợ Lý Giáo Viên",
+      "Azota - Tạo Đề & Chấm Thi"
+    ]
+  },
+  {
+    "index": 3,
+    "id": "tienich",
+    "name": "🛠️ Tiện ích",
+    "desktopCount": 9,
+    "mobileCount": 9,
+    "matched": true,
+    "titles": [
+      "Quảng lý CCVC Quảng Ngãi",
+      "Ký số",
+      "Thời khóa biểu",
+      "PhET Thí Nghiệm Ảo",
+      "Google Classroom",
+      "Cổng Thông Tin Bộ GD&ĐT",
+      "Thư Viện Pháp Luật Giáo Dục",
+      "Báo Giáo Dục & Thời Đại",
+      "Cổng Dịch Vụ Công Quốc Gia"
+    ]
+  },
+  {
+    "index": 4,
+    "id": "diem",
+    "name": "📊 Sổ điểm",
+    "desktopCount": 3,
+    "mobileCount": 3,
+    "matched": true,
+    "titles": [
+      "vnEdu - Mạng Giáo Dục",
+      "SMAS - Viettel Edu",
+      "Nền Tảng K12Online"
+    ]
+  },
+  {
+    "index": 5,
+    "id": "csdl",
+    "name": "🏫 CSDL Ngành",
+    "desktopCount": 4,
+    "mobileCount": 4,
+    "matched": true,
+    "titles": [
+      "Cơ Sở Dữ Liệu Ngành GD&ĐT",
+      "CSDL Ngành Giáo Dục",
+      "TEMIS - Đánh Giá Chuẩn",
+      "Tập Huấn Giáo Viên GDPT"
+    ]
+  },
+  {
+    "index": 6,
+    "id": "hoclieu",
+    "name": "📚 Học liệu",
+    "desktopCount": 6,
+    "mobileCount": 6,
+    "matched": true,
+    "titles": [
+      "Kho Học Liệu Số iGiaoDuc",
+      "Thư Viện Bài Giảng Violet",
+      "Học Trực Tuyến OLM.VN",
+      "Hành Trang Số - NXBGD",
+      "Sách Cánh Diều - Hoc10",
+      "VietJack - Giáo Án & Đề"
+    ]
+  },
+  {
+    "index": 7,
+    "id": "ai",
+    "name": "🤖 AI & Đổi mới",
+    "desktopCount": 6,
+    "mobileCount": 6,
+    "matched": true,
+    "titles": [
+      "Canva Giáo Dục - Thiết Kế",
+      "Quizizz - Trò Chơi Ôn Tập",
+      "Kahoot! - Đấu Trường Trí Tuệ",
+      "ChatGPT Trợ Lý Giáo Viên",
+      "Padlet - Bảng Tương Tác",
+      "Azota - Tạo Đề & Chấm Thi"
+    ]
+  },
+  {
+    "index": 8,
+    "id": "cat-1789625064973",
+    "name": "👥 Công việc",
+    "desktopCount": 2,
+    "mobileCount": 2,
+    "matched": true,
+    "titles": [
+      "Ký số",
+      "Thời khóa biểu"
+    ]
+  }
+]

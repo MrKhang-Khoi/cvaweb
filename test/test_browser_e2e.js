@@ -69,10 +69,10 @@ async function runE2ETests() {
   });
 
   console.log(`   - Số lượng thẻ website thực tế hiển thị: ${cardCount}`);
-  if (cardCount === 18) {
-    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Render đầy đủ và hoàn hảo 18/18 thẻ website sư phạm!');
+  if (cardCount === 30) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Render đầy đủ và hoàn hảo 30/30 thẻ website sư phạm!');
   } else {
-    console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: portalContainer chỉ render được ${cardCount} thẻ (yêu cầu: 18)`);
+    console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: portalContainer chỉ render được ${cardCount} thẻ (yêu cầu: 30)`);
     hasFailure = true;
   }
 
@@ -82,8 +82,8 @@ async function runE2ETests() {
     return el ? el.textContent.trim() : '';
   });
   console.log(`   - Nhãn đếm: "${counterText}"`);
-  if (counterText === '18 trang web') {
-    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Nhãn số lượng đồng bộ chính xác "18 trang web"');
+  if (counterText === '30 trang web') {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Nhãn số lượng đồng bộ chính xác "30 trang web"');
   } else {
     console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Nhãn counter không khớp: "${counterText}"`);
     hasFailure = true;
@@ -205,8 +205,8 @@ async function runE2ETests() {
     return container ? container.children.length : 0;
   });
   console.log(`   - Số lượng thẻ website hiển thị trên HTTP: ${httpCardCount}`);
-  if (httpCardCount === 18) {
-    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Render hoàn hảo 18/18 thẻ trên môi trường HTTP!');
+  if (httpCardCount === 30) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Render hoàn hảo 30/30 thẻ trên môi trường HTTP!');
   } else {
     console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Số thẻ trên HTTP: ${httpCardCount}`);
     hasFailure = true;
@@ -783,15 +783,15 @@ async function runE2ETests() {
   console.log(`   - Số lượng thẻ website sau nâng cấp: ${upgradeResult.cardCount}`);
   console.log(`   - Nhãn đếm: "${upgradeResult.counterText}"`);
 
-  if (upgradeResult.version === '2026.09.26.01' && upgradeResult.cardCount === 18) {
-    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: In-Place Upgrade thành công 100%! Tự động nhận diện dữ liệu cũ 2026.09.21.03 và nâng cấp lên 2026.09.26.01 với đủ 18 website!');
+  if (upgradeResult.version === '2026.09.26.02' && upgradeResult.cardCount >= 30) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: In-Place Upgrade thành công 100%! Tự động nhận diện dữ liệu cũ 2026.09.21.03 và nâng cấp lên 2026.09.26.02 với đủ website!');
   } else {
     console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: In-Place Upgrade thất bại! Version="${upgradeResult.version}", cardCount=${upgradeResult.cardCount}`);
     hasFailure = true;
   }
 
   // 9.2 Kiểm tra bộ lọc Tab "⭐ Yêu thích ⭐" vs "Tất cả"
-  const favTab = await pageUpgrade.$('button[data-category="favorites"]');
+  const favTab = await pageUpgrade.$('button[data-cat="fav"]');
   if (favTab) {
     await favTab.click();
     await pageUpgrade.waitForTimeout(300);
@@ -808,7 +808,7 @@ async function runE2ETests() {
     }
 
     // Chuyển lại tab Tất cả
-    const allTab = await pageUpgrade.$('button[data-category="all"]');
+    const allTab = await pageUpgrade.$('button[data-cat="all"]');
     if (allTab) {
       await allTab.click();
       await pageUpgrade.waitForTimeout(300);
@@ -817,10 +817,10 @@ async function runE2ETests() {
         return container ? container.children.length : 0;
       });
       console.log(`   - Số thẻ khi quay lại Tab "Tất cả": ${allCount}`);
-      if (allCount === 18) {
-        console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Tab "Tất cả" hiển thị đầy đủ trọn vẹn 18/18 website sư phạm!');
+      if (allCount >= 30) {
+        console.log('\x1b[32m%s\x1b[0m', `   ✅ PASS: Tab "Tất cả" hiển thị đầy đủ trọn vẹn ${allCount} website sư phạm!`);
       } else {
-        console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Tab "Tất cả" không đủ 18 thẻ: ${allCount}`);
+        console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Tab "Tất cả" không đủ thẻ: ${allCount}`);
         hasFailure = true;
       }
     }
@@ -911,8 +911,8 @@ async function runE2ETests() {
   console.log(`   - Danh mục hiển thị: "${postSyncCheck.activeCategory}"`);
   console.log(`   - Số thẻ hiển thị trên màn hình: ${postSyncCheck.cardCount}`);
 
-  if (!postSyncCheck.authModalOpen && !postSyncCheck.syncModalOpen && postSyncCheck.cardCount === 18) {
-    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Thao tác cập nhật trên điện thoại diễn ra mượt mà 100%, KHÔNG BỊ ĐƠ, render trọn vẹn 18 website!');
+  if (!postSyncCheck.authModalOpen && !postSyncCheck.syncModalOpen && postSyncCheck.cardCount === 30) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Thao tác cập nhật trên điện thoại diễn ra mượt mà 100%, KHÔNG BỊ ĐƠ, render trọn vẹn 30 website!');
   } else {
     console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Bị lỗi cập nhật trên Mobile: authOpen=${postSyncCheck.authModalOpen}, syncOpen=${postSyncCheck.syncModalOpen}, cards=${postSyncCheck.cardCount}`);
     hasFailure = true;
@@ -1062,7 +1062,7 @@ async function runE2ETests() {
   console.log(`   - Số thẻ hiển thị trên màn hình điện thoại: ${teacherSyncResult.cardCount}`);
   console.log(`   - Nhãn đếm số lượng: "${teacherSyncResult.counterText}"`);
 
-  if (teacherSyncResult.cardCount >= 18 && teacherSyncResult.activeCategory === 'all') {
+  if (teacherSyncResult.cardCount >= 30 && teacherSyncResult.activeCategory === 'all') {
     console.log('\x1b[32m%s\x1b[0m', `   ✅ PASS: Cập nhật thành công 100%! Hiển thị trọn vẹn ${teacherSyncResult.cardCount} website trường cho giáo viên!`);
   } else {
     console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Kết quả không đạt: cards=${teacherSyncResult.cardCount}, category=${teacherSyncResult.activeCategory}`);

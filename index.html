@@ -3648,42 +3648,61 @@
       // ==========================================================================
       // 1. DANH SÁCH CHUẨN MẪU NGÀNH GIÁO DỤC VIỆT NAM (18 WEBSITE SƯ PHẠM CỐT LÕI)
       // ==========================================================================
+      // 1. DANH SÁCH CHUẨN MẪU NGÀNH GIÁO DỤC (8 DANH MỤC & 30 WEBSITE SƯ PHẠM CỐT LÕI)
+      // ==========================================================================
       const DEFAULT_CATEGORIES = [
         { id: "all", label: "Tất cả", icon: "🌐", system: true },
         { id: "fav", label: "Yêu thích ⭐", icon: "⭐", system: true },
+        { id: "tienich", label: "Tiện ích", icon: "🛠️", system: true },
         { id: "diem", label: "Sổ điểm", icon: "📊" },
         { id: "csdl", label: "CSDL Ngành", icon: "🏫" },
         { id: "hoclieu", label: "Học liệu", icon: "📚" },
         { id: "ai", label: "AI & Đổi mới", icon: "🤖" },
-        { id: "tienich", label: "Tiện ích", icon: "🛠️", system: true }
+        { id: "cat-1789625064973", label: "Công việc", icon: "👥", system: false }
       ];
 
       const DEFAULT_LINKS = [
+        // Tiện ích & Quản lý cán bộ viên chức
+        { id: "link-1789719147041", title: "Quảng lý CCVC Quảng Ngãi", url: "https://cbccvc.quangngai.gov.vn/web/login", category: "tienich", color: "#ea580c", iconChar: "QL", isFavorite: true },
+        { id: "link-ky-so", title: "Ký số", url: "https://mrkhang-khoi.github.io/cvakyso/", category: "tienich", color: "#4f46e5", iconChar: "KS", isFavorite: false },
+        { id: "link-thoi-khoa-bieu", title: "Thời khóa biểu", url: "https://mrkhang-khoi.github.io/tkb/", category: "tienich", color: "#2563eb", iconChar: "TK", isFavorite: false },
+        { id: "link-phet", title: "PhET Thí Nghiệm Ảo", url: "https://phet.colorado.edu/vi/", category: "tienich", color: "#0284c7", iconChar: "PH", isFavorite: false },
+        { id: "link-classroom", title: "Google Classroom", url: "https://classroom.google.com", category: "tienich", color: "#15803d", iconChar: "GC", isFavorite: false },
+        { id: "link-moet", title: "Cổng Thông Tin Bộ GD&ĐT", url: "https://moet.gov.vn", category: "tienich", color: "#dc2626", iconChar: "GD", isFavorite: false },
+        { id: "link-thuvienphapluat", title: "Thư Viện Pháp Luật Giáo Dục", url: "https://thuvienphapluat.vn", category: "tienich", color: "#475569", iconChar: "PL", isFavorite: false },
+        { id: "link-giaoducthoidai", title: "Báo Giáo Dục & Thời Đại", url: "https://giaoducthoidai.vn", category: "tienich", color: "#16a34a", iconChar: "BÁ", isFavorite: false },
+        { id: "link-dichvucong", title: "Cổng Dịch Vụ Công Quốc Gia", url: "https://dichvucong.gov.vn", category: "tienich", color: "#d97706", iconChar: "DV", isFavorite: false },
+
         // Sổ điểm & Quản lý học sinh
         { id: "link-vnedu", title: "vnEdu - Mạng Giáo Dục", url: "https://vnedu.vn", category: "diem", color: "#2563eb", iconChar: "VN", isFavorite: true },
         { id: "link-smas", title: "SMAS - Viettel Edu", url: "https://smas.edu.vn", category: "diem", color: "#0891b2", iconChar: "SM", isFavorite: true },
+        { id: "link-k12online", title: "Nền Tảng K12Online", url: "https://k12online.vn", category: "diem", color: "#0891b2", iconChar: "K12", isFavorite: false },
+
+        // CSDL Ngành & Đánh giá chuẩn nghề nghiệp
+        { id: "link-csdl-moet", title: "Cơ Sở Dữ Liệu Ngành GD&ĐT", url: "https://csdl.moet.gov.vn", category: "csdl", color: "#dc2626", iconChar: "CS", isFavorite: true },
         { id: "link-csdl", title: "CSDL Ngành Giáo Dục", url: "https://csdl.moet.gov.vn", category: "csdl", color: "#4f46e5", iconChar: "CS", isFavorite: false },
         { id: "link-temis", title: "TEMIS - Đánh Giá Chuẩn", url: "https://temis.csdl.edu.vn", category: "csdl", color: "#7c3aed", iconChar: "TM", isFavorite: false },
         { id: "link-tapuan", title: "Tập Huấn Giáo Viên GDPT", url: "https://taphuan.csdl.edu.vn", category: "csdl", color: "#d97706", iconChar: "TH", isFavorite: false },
 
         // Học liệu & Soạn giảng
-        { id: "link-violet", title: "Thư Viện Bài Giảng Violet", url: "https://baigiang.violet.vn", category: "hoclieu", color: "#7c3aed", iconChar: "VL", isFavorite: true },
-        { id: "link-hanhtrangso", title: "Hành Trang Số - NXBGD", url: "https://hanhtrangso.nxbgd.vn", category: "hoclieu", color: "#ea580c", iconChar: "HT", isFavorite: false },
+        { id: "link-igiaoduc", title: "Kho Học Liệu Số iGiaoDuc", url: "https://igiaoduc.vn", category: "hoclieu", color: "#4f46e5", iconChar: "iG", isFavorite: true },
+        { id: "link-violet", title: "Thư Viện Bài Giảng Violet", url: "https://baigiang.violet.vn", category: "hoclieu", color: "#7c3aed", iconChar: "VL", isFavorite: false },
         { id: "link-olm", title: "Học Trực Tuyến OLM.VN", url: "https://olm.vn", category: "hoclieu", color: "#16a34a", iconChar: "OL", isFavorite: false },
+        { id: "link-hanhtrangso", title: "Hành Trang Số - NXBGD", url: "https://hanhtrangso.nxbgd.vn", category: "hoclieu", color: "#ea580c", iconChar: "HT", isFavorite: true },
+        { id: "link-hoc10", title: "Sách Cánh Diều - Hoc10", url: "https://hoc10.vn", category: "hoclieu", color: "#16a34a", iconChar: "H10", isFavorite: false },
         { id: "link-vietjack", title: "VietJack - Giáo Án & Đề", url: "https://vietjack.com", category: "hoclieu", color: "#dc2626", iconChar: "VJ", isFavorite: false },
 
-        // Kiểm tra & Đổi mới giảng dạy
-        { id: "link-azota", title: "Azota - Tạo Đề & Chấm Thi", url: "https://azota.vn", category: "ai", color: "#2563eb", iconChar: "AZ", isFavorite: true },
+        // AI & Đổi mới kiểm tra đánh giá
+        { id: "link-canva", title: "Canva Giáo Dục - Thiết Kế", url: "https://www.canva.com", category: "ai", color: "#0891b2", iconChar: "CV", isFavorite: true },
         { id: "link-quizizz", title: "Quizizz - Trò Chơi Ôn Tập", url: "https://quizizz.com", category: "ai", color: "#db2777", iconChar: "QZ", isFavorite: false },
         { id: "link-kahoot", title: "Kahoot! - Đấu Trường Trí Tuệ", url: "https://kahoot.com", category: "ai", color: "#4f46e5", iconChar: "KH", isFavorite: false },
-        { id: "link-canva", title: "Canva Giáo Dục - Thiết Kế", url: "https://www.canva.com", category: "ai", color: "#0891b2", iconChar: "CV", isFavorite: false },
+        { id: "link-chatgpt", title: "ChatGPT Trợ Lý Giáo Viên", url: "https://chatgpt.com", category: "ai", color: "#059669", iconChar: "AI", isFavorite: true },
         { id: "link-padlet", title: "Padlet - Bảng Tương Tác", url: "https://padlet.com", category: "ai", color: "#ea580c", iconChar: "PD", isFavorite: false },
+        { id: "link-azota", title: "Azota - Tạo Đề & Chấm Thi", url: "https://azota.vn", category: "ai", color: "#2563eb", iconChar: "AZ", isFavorite: true },
 
-        // Tiện ích & Pháp lý sư phạm
-        { id: "link-moet", title: "Cổng Thông Tin Bộ GD&ĐT", url: "https://moet.gov.vn", category: "tienich", color: "#dc2626", iconChar: "GD", isFavorite: false },
-        { id: "link-thuvienphapluat", title: "Thư Viện Pháp Luật Giáo Dục", url: "https://thuvienphapluat.vn", category: "tienich", color: "#475569", iconChar: "PL", isFavorite: false },
-        { id: "link-giaoducthoidai", title: "Báo Giáo Dục & Thời Đại", url: "https://giaoducthoidai.vn", category: "tienich", color: "#16a34a", iconChar: "BÁ", isFavorite: false },
-        { id: "link-dichvucong", title: "Cổng Dịch Vụ Công Quốc Gia", url: "https://dichvucong.gov.vn", category: "tienich", color: "#d97706", iconChar: "DV", isFavorite: false }
+        // Công việc
+        { id: "link-1789625972281", title: "Ký số", url: "https://mrkhang-khoi.github.io/cvakyso/public/index.html", category: "cat-1789625064973", color: "#4f46e5", iconChar: "KS", isFavorite: false },
+        { id: "link-1789625446264", title: "Thời khóa biểu", url: "https://mrkhang-khoi.github.io/tkb/", category: "cat-1789625064973", color: "#4f46e5", iconChar: "TK", isFavorite: false }
       ];
 
       const COLOR_PALETTE = [
@@ -3693,7 +3712,7 @@
       ];
 
       // Phiên bản dữ liệu chuẩn hệ thống (Tự động nâng cấp khi Admin cập nhật DEFAULT_LINKS)
-      const CURRENT_DATA_VERSION = "2026.09.26.01";
+      const CURRENT_DATA_VERSION = "2026.09.26.02";
 
       // ==========================================================================
       // 2. STATE & MẬT MÃ HỌC AN TOÀN (NIST SHA-256 & WEB CRYPTO AES-256-GCM)
@@ -12482,63 +12501,71 @@
 
           let mergeResult = null;
           await executeWithCrossTabLock(async (lockCtx) => {
+            let addedCount = 0;
+            let updatedCount = 0;
             const rawCloudLinks = cloudConfig.links || [];
             const rawCloudCats = cloudConfig.categories || [];
 
             const validCloudCats = rawCloudCats.filter(c => c && typeof c === "object" && typeof c.id === "string" && typeof c.label === "string");
             const validCloudLinks = rawCloudLinks.filter(l => l && typeof l === "object" && typeof l.id === "string" && typeof l.title === "string" && typeof l.url === "string" && /^https?:\/\//i.test(l.url.trim()));
 
-            let updatedCount = 0;
-            let addedCount = 0;
-
-            const catMap = new Map(categoriesData.map(c => [c.id, c]));
-            validCloudCats.forEach(cCat => {
-              if (catMap.has(cCat.id)) {
-                const exist = catMap.get(cCat.id);
-                if (exist.label !== cCat.label || exist.icon !== cCat.icon) {
-                  exist.label = cCat.label;
-                  exist.icon = cCat.icon;
+            if (forceCheck) {
+              // Đồng bộ chuẩn hóa 100% theo Cloud Master của trường:
+              // Đưa toàn bộ Danh mục và Liên kết về đồng nhất tuyệt đối giữa Điện thoại và Máy tính
+              categoriesData = JSON.parse(JSON.stringify(validCloudCats));
+              linksData = JSON.parse(JSON.stringify(validCloudLinks));
+              addedCount = validCloudLinks.length;
+              updatedCount = validCloudLinks.length;
+            } else {
+              const catMap = new Map(categoriesData.map(c => [c.id, c]));
+              validCloudCats.forEach(cCat => {
+                if (catMap.has(cCat.id)) {
+                  const exist = catMap.get(cCat.id);
+                  if (exist.label !== cCat.label || exist.icon !== cCat.icon) {
+                    exist.label = cCat.label;
+                    exist.icon = cCat.icon;
+                  }
+                } else {
+                  categoriesData.push({ ...cCat });
+                  catMap.set(cCat.id, cCat);
                 }
-              } else {
-                categoriesData.push({ ...cCat });
-                catMap.set(cCat.id, cCat);
-              }
-            });
+              });
 
-            const cloudLinksMap = new Map(validCloudLinks.map(l => [l.id, l]));
-            const localLinkIds = new Set(linksData.map(l => l.id));
+              const cloudLinksMap = new Map(validCloudLinks.map(l => [l.id, l]));
+              const localLinkIds = new Set(linksData.map(l => l.id));
 
-            linksData.forEach((locLink, idx) => {
-              if (cloudLinksMap.has(locLink.id)) {
-                const cLink = cloudLinksMap.get(locLink.id);
-                const hasChanged = locLink.url !== cLink.url ||
-                                   locLink.title !== cLink.title ||
-                                   locLink.desc !== cLink.desc ||
-                                   locLink.category !== cLink.category ||
-                                   locLink.color !== cLink.color ||
-                                   locLink.iconChar !== cLink.iconChar;
-                if (hasChanged) {
-                  linksData[idx] = {
-                    ...locLink,
-                    url: cLink.url,
-                    title: cLink.title,
-                    desc: cLink.desc || locLink.desc,
-                    category: cLink.category,
-                    color: cLink.color || locLink.color,
-                    iconChar: cLink.iconChar || locLink.iconChar
-                  };
-                  updatedCount++;
+              linksData.forEach((locLink, idx) => {
+                if (cloudLinksMap.has(locLink.id)) {
+                  const cLink = cloudLinksMap.get(locLink.id);
+                  const hasChanged = locLink.url !== cLink.url ||
+                                     locLink.title !== cLink.title ||
+                                     locLink.desc !== cLink.desc ||
+                                     locLink.category !== cLink.category ||
+                                     locLink.color !== cLink.color ||
+                                     locLink.iconChar !== cLink.iconChar;
+                  if (hasChanged) {
+                    linksData[idx] = {
+                      ...locLink,
+                      url: cLink.url,
+                      title: cLink.title,
+                      desc: cLink.desc || locLink.desc,
+                      category: cLink.category,
+                      color: cLink.color || locLink.color,
+                      iconChar: cLink.iconChar || locLink.iconChar
+                    };
+                    updatedCount++;
+                  }
                 }
-              }
-            });
+              });
 
-            validCloudLinks.forEach(cLink => {
-              if (!localLinkIds.has(cLink.id)) {
-                linksData.push({ ...cLink });
-                localLinkIds.add(cLink.id);
-                addedCount++;
-              }
-            });
+              validCloudLinks.forEach(cLink => {
+                if (!localLinkIds.has(cLink.id)) {
+                  linksData.push({ ...cLink });
+                  localLinkIds.add(cLink.id);
+                  addedCount++;
+                }
+              });
+            }
 
             await updateUnifiedStoreUnlocked(lockCtx);
             safeStorageSet("teacher_hub_cloud_synced_at", String(cloudVerData.updatedAt));
@@ -12546,7 +12573,10 @@
             mergeResult = { success: true, updated: true, addedCount, updatedCount };
           });
 
-          currentCategory = "all";
+          // Bảo toàn tab danh mục người dùng đang xem nếu danh mục đó vẫn tồn tại
+          if (!categoriesData.some(c => c && c.id === currentCategory)) {
+            currentCategory = "all";
+          }
           renderCategoryTabs();
           renderItems();
           if (typeof syncBottomDock === "function") syncBottomDock();
@@ -12574,8 +12604,9 @@
        * Tự động kéo từ Cloud Firebase, nếu ngoại tuyến sẽ tự động di cư từ DEFAULT_LINKS
        * Tự động chuyển danh mục về "all" để hiển thị đầy đủ 18 website sư phạm
        */
-      async function performTeacherDataSync(options = { showNotification: true }) {
+      async function performTeacherDataSync(options = { showNotification: true, resetCategory: true }) {
         const isShowNotif = options && options.showNotification !== false;
+        const isResetCategory = options ? options.resetCategory !== false : true;
         if (isCloudSyncing) {
           if (isShowNotif) showToast("⏳ Đang đồng bộ dữ liệu, vui lòng chờ trong giây lát...", "info");
           return { success: false, error: "SyncInProgress" };
@@ -12639,8 +12670,12 @@
             }
           }
 
-          // 3. Đảm bảo hiển thị đầy đủ: chuyển về danh mục "all"
-          currentCategory = "all";
+          // 3. Đảm bảo hiển thị đầy đủ: chuyển về danh mục "all" khi người dùng chủ động bấm Cập nhật
+          if (isResetCategory) {
+            currentCategory = "all";
+          } else if (!categoriesData.some(c => c && c.id === currentCategory)) {
+            currentCategory = "all";
+          }
           refreshAllAfterSync();
 
           const totalWebsites = Array.isArray(linksData) ? linksData.length : 18;
@@ -12866,7 +12901,7 @@
         // Tự động kiểm tra cập nhật đám mây toàn trường khi trực tuyến (không chặn luồng nạp chính)
         if (!isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
           setTimeout(() => {
-            performTeacherDataSync({ showNotification: false }).catch(err => {
+            performTeacherDataSync({ showNotification: false, resetCategory: false }).catch(err => {
               console.warn("[AutoSync] Kiểm tra cập nhật nền gặp lỗi:", err);
             });
           }, 800);
@@ -12876,7 +12911,7 @@
       if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
         window.addEventListener("online", () => {
           if (!isFileProtocol) {
-            performTeacherDataSync({ showNotification: false }).catch(err => {
+            performTeacherDataSync({ showNotification: false, resetCategory: false }).catch(err => {
               console.warn("[AutoSync] Kiểm tra khi kết nối lại mạng gặp lỗi:", err);
             });
           }
@@ -12884,7 +12919,7 @@
 
         document.addEventListener("visibilitychange", () => {
           if (document.visibilityState === "visible" && !isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
-            performTeacherDataSync({ showNotification: false }).catch(err => {
+            performTeacherDataSync({ showNotification: false, resetCategory: false }).catch(err => {
               console.warn("[AutoSync] Kiểm tra khi mở lại app gặp lỗi:", err);
             });
           }
