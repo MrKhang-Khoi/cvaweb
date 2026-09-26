@@ -5133,14 +5133,25 @@ console.log('\n📌 7.7 Kiểm tra Toàn diện Module Đồng bộ Đám mây C
   assert(htmlContent.includes('teacher_hub_cloud_synced_at'), 'Cloud Sync Marker: Ghi nhận dấu mốc đồng bộ teacher_hub_cloud_synced_at để tối ưu hóa lưu lượng tải');
   assert(htmlContent.includes('cloudLinksMap.has(locLink.id)') && htmlContent.includes('localLinkIds.has(cLink.id)'), 'Smart Merge Algorithm: Triệt để bảo toàn liên kết cá nhân của giáo viên và cập nhật đè link hệ thống');
   assert(htmlContent.includes('validCloudCats.forEach') && htmlContent.includes('catMap.has(cCat.id)'), 'Smart Category Merge: Tự động nạp danh mục mới từ trường mà không ghi đè danh mục cá nhân');
-  assert(swContent.includes("CACHE_NAME = 'teacher-hub-v2.2.0'"), 'PWA Cache Invariant: Service Worker sw.js nâng cấp lên CACHE_NAME teacher-hub-v2.2.0');
+  assert(swContent.includes("CACHE_NAME = 'teacher-hub-v2.3.0'"), 'PWA Cache Invariant: Service Worker sw.js nâng cấp lên CACHE_NAME teacher-hub-v2.3.0');
 }
 
 // 8. KIỂM THỬ PLAYWRIGHT E2E TRÌNH DUYỆT THẬT (DUAL ENVIRONMENT: FILE:/// VÀ HTTP://LOCALHOST)
 console.log('\n📌 8. Kiểm thử Playwright E2E Thực tế trên Trình duyệt kép:');
 try {
   const e2eScript = path.join(__dirname, 'test_browser_e2e.js');
-  execSync(`node "${e2eScript}"`, { stdio: 'inherit' });
+  const projectRoot = path.join(__dirname, '..');
+  const nodePaths = [
+    path.join(projectRoot, 'node_modules'),
+    path.join('C:\\Users\\HPZBook\\Desktop\\TIỆN TÍCH GIÁO VIÊN', 'node_modules')
+  ].filter(p => fs.existsSync(p)).join(path.delimiter);
+  execSync(`node "${e2eScript}"`, {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      NODE_PATH: process.env.NODE_PATH ? (process.env.NODE_PATH + path.delimiter + nodePaths) : nodePaths
+    }
+  });
   assert(true, 'Kiểm thử Playwright E2E: PASS 100% (0 console errors, render đủ 18 website trên cả file:/// và HTTP)');
 } catch(err) {
   assert(false, `Lỗi kiểm thử Playwright E2E: ${err.message}`);

@@ -4,7 +4,16 @@
  * Đo đạc: 0 Console Errors, Render chính xác 18 thẻ Website, Tương tác lọc/tìm kiếm chuẩn xác
  */
 
-const { chromium } = require('playwright');
+let chromium;
+try {
+  chromium = require('playwright').chromium;
+} catch (e) {
+  try {
+    chromium = require('C:/Users/HPZBook/Desktop/TIỆN TÍCH GIÁO VIÊN/node_modules/playwright').chromium;
+  } catch {
+    throw e;
+  }
+}
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -724,6 +733,101 @@ async function runE2ETests() {
   await pageA.close();
   await pageB.close();
   await sharedContext.close();
+
+  // =========================================================================
+  // TEST 9: KIỂM THỬ NÂNG CẤP TỪ DỮ LIỆU CŨ (IN-PLACE UPGRADE MIGRATION TEST)
+  // Giả lập máy khách đã lưu bản dữ liệu cũ 2026.09.21.03 (chỉ có 8 links)
+  // Xác minh: Tự động phát hiện phiên bản mới 2026.09.26.01 và migrate lên đủ 18 links!
+  // =========================================================================
+  console.log('\n\x1b[33m%s\x1b[0m', '📌 TEST 9: Kiểm thử Nâng cấp từ Dữ liệu cũ (In-Place Upgrade Migration Invariant):');
+  const upgradeContext = await browser.newContext();
+  const pageUpgrade = await upgradeContext.newPage();
+
+  await pageUpgrade.addInitScript(() => {
+    const old8Links = [
+      { id: "canva", title: "Canva Giáo Dục", url: "https://www.canva.com", category: "soan-giang", color: "#2563eb", iconChar: "🎨", isFavorite: true },
+      { id: "azota", title: "Azota - Tạo Đề & Chấm Thi", url: "https://azota.vn", category: "kiem-tra", color: "#16a34a", iconChar: "📝", isFavorite: true },
+      { id: "padlet", title: "Padlet", url: "https://padlet.com", category: "soan-giang", color: "#ea580c", iconChar: "📌", isFavorite: true },
+      { id: "kahoot", title: "Kahoot!", url: "https://kahoot.com", category: "kiem-tra", color: "#7c3aed", iconChar: "🎮", isFavorite: true },
+      { id: "quizizz", title: "Quizizz", url: "https://quizizz.com", category: "kiem-tra", color: "#db2777", iconChar: "⚡", isFavorite: true },
+      { id: "wordwall", title: "Wordwall", url: "https://wordwall.net", category: "kiem-tra", color: "#0891b2", iconChar: "🧩", isFavorite: true },
+      { id: "violet", title: "Thư Viện Bài Giảng Violet", url: "https://baigiang.violet.vn", category: "soan-giang", color: "#4f46e5", iconChar: "📚", isFavorite: true },
+      { id: "olm", title: "OLM - Học Trực Tuyến", url: "https://olm.vn", category: "truc-tuyen", color: "#d97706", iconChar: "🎓", isFavorite: true }
+    ];
+    localStorage.setItem("teacher_hub_data_version", "2026.09.21.03");
+    localStorage.setItem("teacher_hub_links_v1", JSON.stringify(old8Links));
+    localStorage.setItem("teacher_hub_store_v2", JSON.stringify({
+      schemaVersion: 2,
+      version: "2026.09.21.03",
+      links: old8Links,
+      categories: []
+    }));
+  });
+
+  await pageUpgrade.goto(fileUrl, { waitUntil: 'load' });
+  await pageUpgrade.waitForTimeout(1000);
+
+  const upgradeResult = await pageUpgrade.evaluate(() => {
+    const v = localStorage.getItem("teacher_hub_data_version");
+    const container = document.getElementById('portalContainer');
+    const cardCount = container ? container.children.length : 0;
+    const counterText = document.getElementById('counterLabel')?.textContent.trim() || '';
+    return {
+      version: v,
+      cardCount: cardCount,
+      counterText: counterText
+    };
+  });
+
+  console.log(`   - Phiên bản sau khi tự động nạp trang: "${upgradeResult.version}"`);
+  console.log(`   - Số lượng thẻ website sau nâng cấp: ${upgradeResult.cardCount}`);
+  console.log(`   - Nhãn đếm: "${upgradeResult.counterText}"`);
+
+  if (upgradeResult.version === '2026.09.26.01' && upgradeResult.cardCount === 18) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: In-Place Upgrade thành công 100%! Tự động nhận diện dữ liệu cũ 2026.09.21.03 và nâng cấp lên 2026.09.26.01 với đủ 18 website!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: In-Place Upgrade thất bại! Version="${upgradeResult.version}", cardCount=${upgradeResult.cardCount}`);
+    hasFailure = true;
+  }
+
+  // 9.2 Kiểm tra bộ lọc Tab "⭐ Yêu thích ⭐" vs "Tất cả"
+  const favTab = await pageUpgrade.$('button[data-category="favorites"]');
+  if (favTab) {
+    await favTab.click();
+    await pageUpgrade.waitForTimeout(300);
+    const favCount = await pageUpgrade.evaluate(() => {
+      const container = document.getElementById('portalContainer');
+      return container ? container.children.length : 0;
+    });
+    console.log(`   - Số thẻ trong Tab "Yêu thích": ${favCount}`);
+    if (favCount >= 4) {
+      console.log('\x1b[32m%s\x1b[0m', `   ✅ PASS: Lọc tab Yêu thích chuẩn xác (${favCount} website có gắn sao ⭐)`);
+    } else {
+      console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Tab Yêu thích hiển thị không đúng: ${favCount}`);
+      hasFailure = true;
+    }
+
+    // Chuyển lại tab Tất cả
+    const allTab = await pageUpgrade.$('button[data-category="all"]');
+    if (allTab) {
+      await allTab.click();
+      await pageUpgrade.waitForTimeout(300);
+      const allCount = await pageUpgrade.evaluate(() => {
+        const container = document.getElementById('portalContainer');
+        return container ? container.children.length : 0;
+      });
+      console.log(`   - Số thẻ khi quay lại Tab "Tất cả": ${allCount}`);
+      if (allCount === 18) {
+        console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Tab "Tất cả" hiển thị đầy đủ trọn vẹn 18/18 website sư phạm!');
+      } else {
+        console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Tab "Tất cả" không đủ 18 thẻ: ${allCount}`);
+        hasFailure = true;
+      }
+    }
+  }
+
+  await pageUpgrade.close();
+  await upgradeContext.close();
 
   await pageMobile.close();
   await pageHttp.close();
