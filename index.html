@@ -1762,6 +1762,118 @@
       transform: scale(0.96);
     }
 
+    /* Nút Cập Nhật Nhanh Dành Cho Giáo Viên (Zero-Admin PIN) */
+    .btn-teacher-sync {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 12px;
+      min-height: 36px;
+      border-radius: var(--radius-full);
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #ffffff !important;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      font-size: 0.80rem;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35);
+      transition: all 0.15s ease;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .btn-teacher-sync:hover {
+      background: linear-gradient(135deg, #059669, #047857);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(16, 185, 129, 0.45);
+    }
+
+    .btn-teacher-sync:active {
+      transform: scale(0.96);
+    }
+
+    .btn-teacher-sync.syncing {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      opacity: 0.9;
+      cursor: wait;
+      pointer-events: none;
+    }
+
+    .btn-teacher-sync.syncing .sync-icon {
+      display: inline-block;
+      animation: spinTeacherSync 0.8s linear infinite;
+    }
+
+    @keyframes spinTeacherSync {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .btn-sub-sync {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(37, 99, 235, 0.08);
+      color: var(--primary);
+      border: 1px solid rgba(37, 99, 235, 0.25);
+      border-radius: var(--radius-full);
+      padding: 2px 9px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .btn-sub-sync:hover {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+    }
+
+    .btn-sub-sync:active {
+      transform: scale(0.96);
+    }
+
+    [data-theme="dark"] .btn-teacher-sync {
+      background: linear-gradient(135deg, #059669, #047857);
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+    }
+
+    [data-theme="dark"] .btn-sub-sync {
+      background: rgba(59, 130, 246, 0.18);
+      color: #93c5fd;
+      border-color: rgba(59, 130, 246, 0.35);
+    }
+
+    /* Mobile Pull-to-Refresh Indicator */
+    .pull-refresh-indicator {
+      position: fixed;
+      top: -50px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--card-bg);
+      border: 1.5px solid var(--primary);
+      color: var(--primary);
+      padding: 6px 16px;
+      border-radius: var(--radius-full);
+      font-size: 0.82rem;
+      font-weight: 700;
+      box-shadow: var(--shadow-md);
+      z-index: 999;
+      pointer-events: none;
+      transition: top 0.2s ease, opacity 0.2s ease;
+      opacity: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pull-refresh-indicator.visible {
+      top: 16px;
+      opacity: 1;
+    }
+
     .reminder-badge-count {
       position: absolute;
       top: -2px;
@@ -2285,6 +2397,13 @@
           </svg>
         </button>
 
+        <!-- Cập nhật nhanh danh sách website cho Giáo viên (1 chạm, không cần mã PIN) -->
+        <button type="button" id="phoneQuickSyncHeaderBtn" class="icon-btn" title="Cập nhật nhanh danh sách website từ trường" style="color: #10b981;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+          </svg>
+        </button>
+
         <!-- Sao lưu & Đồng bộ -->
         <button id="phoneBackupBtn" class="icon-btn" title="Sao lưu hoặc Nhập danh sách web">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2295,6 +2414,9 @@
         </button>
       </div>
     </header>
+
+    <!-- CHỈ BÁO VUỐT CẬP NHẬT TRÊN ĐIỆN THOẠI (PULL TO REFRESH) -->
+    <div id="mobilePullIndicator" class="pull-refresh-indicator"></div>
 
     <!-- GREETING CHIP (MINIMALIST & BALANCED) -->
     <div class="mini-greeting-chip">
@@ -2312,6 +2434,11 @@
         </div>
       </div>
       <div class="greeting-right">
+        <!-- Nút Cập Nhật Dành Cho Giáo Viên (Zero-Admin PIN) -->
+        <button type="button" id="btnTeacherQuickSync" class="btn-teacher-sync" title="Bấm để kiểm tra và cập nhật các website mới nhất từ trường">
+          <span class="sync-icon">🔄</span>
+          <span class="sync-text">Cập nhật</span>
+        </button>
         <button id="btnInstallPwa" class="btn-install-pwa" title="Cài ứng dụng vào điện thoại để mở nhanh và dùng offline" hidden>
           <span>📲 Cài App</span>
         </button>
@@ -2404,7 +2531,10 @@
 
     <!-- SUB CONTROL: SỐ LƯỢNG & CHẾ ĐỘ HIỂN THỊ (DANH SÁCH / LƯỚI) -->
     <div class="sub-control-row">
-      <span class="counter-label" id="counterLabel">Đang tải...</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="counter-label" id="counterLabel">Đang tải...</span>
+        <button type="button" id="btnSubControlSync" class="btn-sub-sync" title="Bấm để kiểm tra và cập nhật các website mới nhất từ trường">🔄 Cập nhật</button>
+      </div>
       <div class="view-toggle-btns">
         <button id="btnViewList" class="view-toggle-btn active" title="Dạng danh sách cuộn nhanh">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -7662,6 +7792,7 @@
       // 5. RENDER CATEGORY TABS
       // ==========================================================================
       function renderCategoryTabs() {
+        window.currentCategory = currentCategory;
         const container = document.getElementById("catScrollTrack");
         if (!container) return;
 
@@ -12316,7 +12447,8 @@
           }
 
           const localSyncAt = Number(localStorage.getItem("teacher_hub_cloud_synced_at") || 0);
-          if (!isManual && cloudVerData.updatedAt <= localSyncAt) {
+          const needsHealing = Array.isArray(linksData) && linksData.length < 18;
+          if (!isManual && !needsHealing && cloudVerData.updatedAt <= localSyncAt) {
             return { success: true, updated: false };
           }
 
@@ -12400,8 +12532,10 @@
             mergeResult = { success: true, updated: true, addedCount, updatedCount };
           });
 
+          currentCategory = "all";
           renderCategoryTabs();
           renderItems();
+          if (typeof syncBottomDock === "function") syncBottomDock();
 
           if (mergeResult && (mergeResult.addedCount > 0 || mergeResult.updatedCount > 0)) {
             showToast(`☁️ Đã đồng bộ từ trường: Cập nhật ${mergeResult.updatedCount} và thêm ${mergeResult.addedCount} liên kết mới!`);
@@ -12416,6 +12550,186 @@
           }
           return { success: false, error: err.message };
         }
+      }
+
+      /**
+       * Cập nhật dữ liệu tức thì dành riêng cho Giáo viên
+       * KHÔNG YÊU CẦU MẬT KHẨU ADMIN (Zero-Admin PIN)
+       * Tự động kéo từ Cloud Firebase, nếu ngoại tuyến sẽ tự động di cư từ DEFAULT_LINKS
+       * Tự động chuyển danh mục về "all" để hiển thị đầy đủ 18 website sư phạm
+       */
+      async function performTeacherDataSync(options = { showNotification: true }) {
+        const isShowNotif = options && options.showNotification !== false;
+        if (isCloudSyncing) {
+          if (isShowNotif) showToast("⏳ Đang đồng bộ dữ liệu, vui lòng chờ trong giây lát...", "info");
+          return { success: false, error: "SyncInProgress" };
+        }
+
+        const syncBtn = document.getElementById("btnTeacherQuickSync");
+        const headerSyncBtn = document.getElementById("phoneQuickSyncHeaderBtn");
+        const subSyncBtn = document.getElementById("btnSubControlSync");
+
+        if (syncBtn) {
+          syncBtn.classList.add("syncing");
+          syncBtn.setAttribute("disabled", "true");
+          const txt = syncBtn.querySelector(".sync-text");
+          if (txt) txt.textContent = "Đang nạp...";
+        }
+        if (headerSyncBtn) {
+          headerSyncBtn.classList.add("syncing");
+          headerSyncBtn.setAttribute("disabled", "true");
+        }
+        if (subSyncBtn) {
+          subSyncBtn.classList.add("syncing");
+          subSyncBtn.setAttribute("disabled", "true");
+          subSyncBtn.textContent = "⏳ Đang nạp...";
+        }
+
+        if (isShowNotif) {
+          showToast("🔄 Đang kiểm tra và cập nhật các website mới từ trường...", "info");
+        }
+
+        let syncSuccess = false;
+        let changeSummary = { added: 0, updated: 0 };
+
+        try {
+          // 1. Thử kéo từ Firebase Cloud nếu online
+          if (!isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
+            try {
+              const cloudRes = await checkCloudSystemUpdates(true);
+              if (cloudRes && cloudRes.success) {
+                syncSuccess = true;
+                changeSummary.added = cloudRes.addedCount || 0;
+                changeSummary.updated = cloudRes.updatedCount || 0;
+              }
+            } catch(eCloud) {
+              console.warn("[TeacherSync] Không thể nạp từ Cloud, chuyển sang cập nhật nội bộ:", eCloud);
+            }
+          }
+
+          // 2. Nếu ngoại tuyến hoặc Cloud không có dữ liệu mới, chạy atomic system migration
+          if (!syncSuccess) {
+            try {
+              await executeWithCrossTabLock(async (lockCtx) => {
+                const migRes = performAtomicSystemMigration(true, lockCtx);
+                if (migRes && migRes.success) {
+                  syncSuccess = true;
+                  changeSummary.added = migRes.addedCount || 0;
+                  changeSummary.updated = migRes.updatedCount || 0;
+                }
+              });
+            } catch(eMig) {
+              console.warn("[TeacherSync] Lỗi di cư nội bộ:", eMig);
+            }
+          }
+
+          // 3. Đảm bảo hiển thị đầy đủ: chuyển về danh mục "all"
+          currentCategory = "all";
+          refreshAllAfterSync();
+
+          const totalWebsites = Array.isArray(linksData) ? linksData.length : 18;
+          if (isShowNotif) {
+            if (changeSummary.added > 0 || changeSummary.updated > 0) {
+              showToast(`🎉 Cập nhật thành công! Đã thêm ${changeSummary.added} và làm mới ${changeSummary.updated} website (Tổng: ${totalWebsites} web).`);
+            } else {
+              showToast(`✅ Đã cập nhật xong! Đang hiển thị trọn vẹn ${totalWebsites} website của trường.`);
+            }
+          }
+
+          return { success: true, count: totalWebsites, changes: changeSummary };
+        } catch(err) {
+          console.error("[TeacherSync] Lỗi cập nhật:", err);
+          if (isShowNotif) {
+            showToast(`⚠️ Không thể hoàn tất cập nhật: ${err.message || "Vui lòng thử lại"}`, "error");
+          }
+          return { success: false, error: err.message };
+        } finally {
+          if (syncBtn) {
+            syncBtn.classList.remove("syncing");
+            syncBtn.removeAttribute("disabled");
+            const txt = syncBtn.querySelector(".sync-text");
+            if (txt) txt.textContent = "Cập nhật";
+          }
+          if (headerSyncBtn) {
+            headerSyncBtn.classList.remove("syncing");
+            headerSyncBtn.removeAttribute("disabled");
+          }
+          if (subSyncBtn) {
+            subSyncBtn.classList.remove("syncing");
+            subSyncBtn.removeAttribute("disabled");
+            subSyncBtn.textContent = "🔄 Cập nhật";
+          }
+        }
+      }
+
+      // Gắn sự kiện cho các nút Cập nhật nhanh
+      const btnTeacherQuickSync = document.getElementById("btnTeacherQuickSync");
+      if (btnTeacherQuickSync) {
+        btnTeacherQuickSync.addEventListener("click", () => {
+          performTeacherDataSync({ showNotification: true });
+        });
+      }
+
+      const phoneQuickSyncHeaderBtn = document.getElementById("phoneQuickSyncHeaderBtn");
+      if (phoneQuickSyncHeaderBtn) {
+        phoneQuickSyncHeaderBtn.addEventListener("click", () => {
+          performTeacherDataSync({ showNotification: true });
+        });
+      }
+
+      const btnSubControlSync = document.getElementById("btnSubControlSync");
+      if (btnSubControlSync) {
+        btnSubControlSync.addEventListener("click", () => {
+          performTeacherDataSync({ showNotification: true });
+        });
+      }
+
+      // Mobile Touch Pull-to-Refresh Gesture (Vuốt màn hình để cập nhật)
+      let touchStartY = 0;
+      let isPulling = false;
+      const pullThreshold = 75;
+
+      if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+        window.addEventListener("touchstart", (e) => {
+          if (window.scrollY === 0 && e.touches && e.touches.length === 1) {
+            touchStartY = e.touches[0].clientY;
+            isPulling = true;
+          } else {
+            isPulling = false;
+          }
+        }, { passive: true });
+
+        window.addEventListener("touchmove", (e) => {
+          if (!isPulling || !e.touches || e.touches.length !== 1) return;
+          const currentY = e.touches[0].clientY;
+          const pullDist = currentY - touchStartY;
+          if (pullDist > 20 && window.scrollY === 0) {
+            const indicator = document.getElementById("mobilePullIndicator");
+            if (indicator) {
+              indicator.classList.add("visible");
+              if (pullDist >= pullThreshold) {
+                indicator.textContent = "↑ Thả tay để cập nhật...";
+              } else {
+                indicator.textContent = "↓ Kéo xuống để cập nhật...";
+              }
+            }
+          }
+        }, { passive: true });
+
+        window.addEventListener("touchend", (e) => {
+          if (!isPulling) return;
+          isPulling = false;
+          const indicator = document.getElementById("mobilePullIndicator");
+          if (indicator) {
+            indicator.classList.remove("visible");
+          }
+          if (e.changedTouches && e.changedTouches.length === 1) {
+            const endY = e.changedTouches[0].clientY;
+            if (endY - touchStartY >= pullThreshold && window.scrollY === 0) {
+              performTeacherDataSync({ showNotification: true });
+            }
+          }
+        }, { passive: true });
       }
 
       // ==========================================================================
@@ -12437,11 +12751,13 @@
         verifyAdminPin,
         showToast,
         syncAdminChangesToCloud,
-        checkCloudSystemUpdates
+        checkCloudSystemUpdates,
+        performTeacherDataSync
       };
 
       window.syncAdminChangesToCloud = syncAdminChangesToCloud;
       window.checkCloudSystemUpdates = checkCloudSystemUpdates;
+      window.performTeacherDataSync = performTeacherDataSync;
       window.performAtomicSystemMigration = performAtomicSystemMigration;
       window.performAtomicSystemRestore = performAtomicSystemRestore;
       window.executeWithCrossTabLock = executeWithCrossTabLock;
@@ -12449,6 +12765,7 @@
       window.validateAndGetUnifiedStore = validateAndGetUnifiedStore;
       window.validateSyncPayload = validateSyncPayload;
       window.syncMemoryFromLatestStorage = syncMemoryFromLatestStorage;
+      window.saveVaultStorageUnlocked = safeVaultStorageUnlocked => safeVaultStorageUnlocked; // safety shim
       window.saveVaultStorageUnlocked = saveVaultStorageUnlocked;
       window.saveVaultStorage = saveVaultStorage;
       window.reconcileProjectionsFromManifest = reconcileProjectionsFromManifest;
@@ -12532,26 +12849,26 @@
         // Tự động kiểm tra cập nhật đám mây toàn trường khi trực tuyến (không chặn luồng nạp chính)
         if (!isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
           setTimeout(() => {
-            checkCloudSystemUpdates(false).catch(err => {
-              console.warn("[CloudSync] Kiểm tra cập nhật nền gặp lỗi:", err);
+            performTeacherDataSync({ showNotification: false }).catch(err => {
+              console.warn("[AutoSync] Kiểm tra cập nhật nền gặp lỗi:", err);
             });
-          }, 1500);
+          }, 800);
         }
       }
 
       if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
         window.addEventListener("online", () => {
           if (!isFileProtocol) {
-            checkCloudSystemUpdates(false).catch(err => {
-              console.warn("[CloudSync] Kiểm tra khi kết nối lại mạng gặp lỗi:", err);
+            performTeacherDataSync({ showNotification: false }).catch(err => {
+              console.warn("[AutoSync] Kiểm tra khi kết nối lại mạng gặp lỗi:", err);
             });
           }
         });
 
         document.addEventListener("visibilitychange", () => {
           if (document.visibilityState === "visible" && !isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
-            checkCloudSystemUpdates(false).catch(err => {
-              console.warn("[CloudSync] Kiểm tra khi mở lại app gặp lỗi:", err);
+            performTeacherDataSync({ showNotification: false }).catch(err => {
+              console.warn("[AutoSync] Kiểm tra khi mở lại app gặp lỗi:", err);
             });
           }
         });

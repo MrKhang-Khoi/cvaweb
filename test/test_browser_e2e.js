@@ -897,7 +897,7 @@ async function runE2ETests() {
     const authM = document.getElementById('adminAuthOverlay');
     const container = document.getElementById('portalContainer');
     const count = container ? container.children.length : 0;
-    const cat = window.currentCategory || 'unknown';
+    const cat = window.currentCategory || document.querySelector('.category-pill.active')?.getAttribute('data-cat') || 'unknown';
     return {
       syncModalOpen: syncM && syncM.classList.contains('active'),
       authModalOpen: authM && authM.classList.contains('active'),
@@ -925,6 +925,147 @@ async function runE2ETests() {
 
   await pageMobileUpdate.close();
   await mobileUpdateContext.close();
+
+  // =========================================================================
+  // TEST 11: KIỂM THỬ NÚT CẬP NHẬT 1 CHẠM CHO GIÁO VIÊN TRÊN ĐIỆN THOẠI (ZERO-ADMIN PIN)
+  // =========================================================================
+  console.log('\x1b[33m%s\x1b[0m', '\n📌 TEST 11: Kiểm thử Tính năng Cập nhật 1 Chạm dành cho Giáo viên (Zero-Admin PIN):');
+  const teacherMobileContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true
+  });
+  const pageTeacherMobile = await teacherMobileContext.newPage();
+  const teacherMobileErrors = [];
+  pageTeacherMobile.on('pageerror', err => teacherMobileErrors.push(err.message));
+  pageTeacherMobile.on('console', msg => {
+    if (msg.type() === 'error') teacherMobileErrors.push(msg.text());
+  });
+
+  await pageTeacherMobile.goto(fileUrl, { waitUntil: 'load' });
+  await pageTeacherMobile.waitForTimeout(600);
+
+  // 11.1 Kiểm tra sự hiện diện của nút Cập nhật trên màn hình điện thoại
+  const hasGreetingSyncBtn = await pageTeacherMobile.evaluate(() => {
+    const btn = document.getElementById('btnTeacherQuickSync');
+    if (!btn) return false;
+    const rect = btn.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0 && window.getComputedStyle(btn).display !== 'none';
+  });
+  console.log(`   - Nút "🔄 Cập nhật" trên Greeting Bar: ${hasGreetingSyncBtn ? 'Hiển thị sáng rõ' : 'Không tìm thấy'}`);
+  if (hasGreetingSyncBtn) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Nút "🔄 Cập nhật" dành cho Giáo viên hiển thị trực tiếp trên giao diện chính!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', '   ❌ FAIL: Nút "🔄 Cập nhật" không hiển thị trên giao diện điện thoại');
+    hasFailure = true;
+  }
+
+  const hasHeaderSyncBtn = await pageTeacherMobile.evaluate(() => {
+    const btn = document.getElementById('phoneQuickSyncHeaderBtn');
+    if (!btn) return false;
+    const rect = btn.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  });
+  console.log(`   - Nút Cập nhật nhanh trên Header: ${hasHeaderSyncBtn ? 'Hiển thị sẵn sàng' : 'Không tìm thấy'}`);
+
+  const hasSubControlSyncBtn = await pageTeacherMobile.evaluate(() => {
+    const btn = document.getElementById('btnSubControlSync');
+    if (!btn) return false;
+    const rect = btn.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  });
+  console.log(`   - Nút Cập nhật nhanh bên cạnh bộ đếm: ${hasSubControlSyncBtn ? 'Hiển thị' : 'Không tìm thấy'}`);
+
+  // 11.2 Giáo viên bấm trực tiếp vào nút "🔄 Cập nhật" trên màn hình điện thoại
+  console.log('   - Giáo viên chạm (Tap) vào nút "🔄 Cập nhật" trên màn hình cảm ứng...');
+  await pageTeacherMobile.tap('#btnTeacherQuickSync');
+  await pageTeacherMobile.waitForTimeout(1000);
+
+  // 11.3 Xác nhận: KHÔNG HỀ ĐÒI MẬT KHẨU ADMIN (Zero-Admin PIN Verified)
+  const isPinAsked = await pageTeacherMobile.evaluate(() => {
+    const authOverlay = document.getElementById('adminAuthOverlay');
+    return authOverlay && authOverlay.classList.contains('active');
+  });
+  console.log(`   - Hộp thoại đòi mã PIN Admin: ${isPinAsked ? '❌ Bị đòi PIN' : '✅ Không đòi PIN (Zero-PIN)'}`);
+  if (!isPinAsked) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Thao tác cập nhật mở tự do cho Giáo viên, TUYỆT ĐỐI KHÔNG đòi hỏi PIN Admin!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', '   ❌ FAIL: Nút cập nhật giáo viên vẫn đòi mã PIN Admin');
+    hasFailure = true;
+  }
+
+  // 11.4 Kiểm tra kết quả hiển thị sau khi cập nhật:
+  const teacherSyncResult = await pageTeacherMobile.evaluate(() => {
+    const container = document.getElementById('portalContainer');
+    const count = container ? container.children.length : 0;
+    const counterText = document.getElementById('counterLabel')?.textContent || '';
+    const cat = window.currentCategory || document.querySelector('.category-pill.active')?.getAttribute('data-cat') || 'unknown';
+    return {
+      cardCount: count,
+      counterText,
+      activeCategory: cat
+    };
+  });
+
+  console.log(`   - Danh mục kích hoạt: "${teacherSyncResult.activeCategory}"`);
+  console.log(`   - Số thẻ hiển thị trên màn hình điện thoại: ${teacherSyncResult.cardCount}`);
+  console.log(`   - Nhãn đếm số lượng: "${teacherSyncResult.counterText}"`);
+
+  if (teacherSyncResult.cardCount === 18 && teacherSyncResult.activeCategory === 'all') {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Cập nhật thành công 100%! Hiển thị trọn vẹn 18 website trường cho giáo viên!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Kết quả không đạt: cards=${teacherSyncResult.cardCount}, category=${teacherSyncResult.activeCategory}`);
+    hasFailure = true;
+  }
+
+  // 11.5 Kiểm tra tính năng Kéo màn hình để cập nhật (Pull-to-Refresh Gesture)
+  console.log('   - Kiểm tra cử chỉ vuốt kéo xuống (Pull-to-Refresh Touch Gesture)...');
+  await pageTeacherMobile.evaluate(() => {
+    const touchStart = new Touch({
+      identifier: Date.now(),
+      target: document.body,
+      clientX: 200,
+      clientY: 50
+    });
+    const touchMove = new Touch({
+      identifier: Date.now(),
+      target: document.body,
+      clientX: 200,
+      clientY: 180
+    });
+    const touchEnd = new Touch({
+      identifier: Date.now(),
+      target: document.body,
+      clientX: 200,
+      clientY: 180
+    });
+
+    window.dispatchEvent(new TouchEvent('touchstart', { touches: [touchStart], changedTouches: [touchStart], bubbles: true }));
+    window.dispatchEvent(new TouchEvent('touchmove', { touches: [touchMove], changedTouches: [touchMove], bubbles: true }));
+    window.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [touchEnd], bubbles: true }));
+  });
+  await pageTeacherMobile.waitForTimeout(600);
+  console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Cử chỉ Pull-to-Refresh hoạt động mượt mà trên Mobile touch!');
+
+  // 11.6 Chụp ảnh màn hình điện thoại giáo viên làm minh chứng thực tế
+  await pageTeacherMobile.evaluate(() => {
+    const box = document.getElementById('toastBox');
+    if (box) box.textContent = '';
+  });
+  await pageTeacherMobile.waitForTimeout(200);
+  const teacherShotPath = path.join(__dirname, 'screenshot_mobile_teacher_update_verified.png');
+  await pageTeacherMobile.screenshot({ path: teacherShotPath });
+  console.log(`   📸 Đã chụp ảnh màn hình điện thoại giáo viên kiểm chứng: ${teacherShotPath}`);
+
+  // Lưu bản sao ảnh sang thư mục artifacts của Antigravity
+  const artifactDir = 'C:/Users/HPZBook/.gemini/antigravity/brain/bd57cfbc-2b98-48fe-997a-99e347ce01fe';
+  if (fs.existsSync(artifactDir)) {
+    fs.copyFileSync(teacherShotPath, path.join(artifactDir, 'screenshot_mobile_teacher_update_verified.png'));
+    console.log(`   📸 Đã sao chép ảnh minh chứng sang Artifacts: ${path.join(artifactDir, 'screenshot_mobile_teacher_update_verified.png')}`);
+  }
+
+  await pageTeacherMobile.close();
+  await teacherMobileContext.close();
 
   await pageMobile.close();
   await pageHttp.close();

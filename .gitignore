@@ -12,3 +12,5 @@ node_modules/
 
 # KHKT separated into independent repo appkhkt2627
 khkt-smart-guardian/
+tests/
+
