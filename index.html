@@ -1024,6 +1024,10 @@
       opacity: 1;
     }
 
+    #adminAuthOverlay, #changePinModal {
+      z-index: 1000 !important;
+    }
+
     .sheet-panel {
       background: var(--card-bg);
       width: 100%;
@@ -3213,8 +3217,8 @@
           <!-- 3b. Cập nhật dữ liệu mới từ hệ thống -->
           <button type="button" id="btnSyncSystemDefaults" class="btn-action" style="background: var(--card-bg); border: 1.5px solid var(--card-border); color: var(--text-main); text-align: left; padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
             <div>
-              <div style="font-weight: 800; font-size: 0.92rem; color: #2563eb;">🔄 Cập Nhật Liên Kết Mới Từ Hệ Thống</div>
-              <div style="font-size: 0.78rem; color: var(--text-mute); margin-top: 2px;">Tự động nạp bổ sung các website mới từ trường (giữ nguyên dữ liệu cá nhân)</div>
+              <div id="btnSyncSystemDefaultsLabel" style="font-weight: 800; font-size: 0.92rem; color: #2563eb;">🔄 Cập Nhật Liên Kết Mới Từ Hệ Thống</div>
+              <div id="btnSyncSystemDefaultsDesc" style="font-size: 0.78rem; color: var(--text-mute); margin-top: 2px;">Tự động nạp bổ sung các website mới từ trường (giữ nguyên dữ liệu cá nhân)</div>
             </div>
             <span style="font-size: 1.2rem; color: var(--text-mute);">➔</span>
           </button>
@@ -9499,25 +9503,31 @@
 
       if (btnSyncSystemDefaults) {
         const executeSyncDefaults = async () => {
-          if (confirm("Kiểm tra và cập nhật các liên kết mới nhất từ hệ thống? (Các liên kết và thông tin cá nhân do Thầy/Cô tự thêm hoặc chỉnh sửa sẽ được bảo toàn 100%)")) {
-            if (!isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
-              try {
-                const cloudRes = await checkCloudSystemUpdates(true);
-                if (cloudRes && cloudRes.success) {
-                  refreshAllAfterSync();
-                  closeSyncModal();
-                  return;
-                }
-              } catch(eCloud) {
-                console.warn("[CloudSync] Không thể đồng bộ qua Cloud, chuyển sang cập nhật nội bộ:", eCloud);
+          btnSyncSystemDefaults.disabled = true;
+          const syncLbl = document.getElementById("btnSyncSystemDefaultsLabel");
+          const syncDesc = document.getElementById("btnSyncSystemDefaultsDesc");
+          if (syncLbl) syncLbl.textContent = "⏳ Đang đồng bộ từ trường...";
+          if (syncDesc) syncDesc.textContent = "Vui lòng chờ trong giây lát...";
+          showToast("🔄 Đang kiểm tra và đồng bộ liên kết từ máy chủ trường...", "info");
+
+          let syncDone = false;
+          if (!isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
+            try {
+              const cloudRes = await checkCloudSystemUpdates(true);
+              if (cloudRes && cloudRes.success) {
+                syncDone = true;
               }
+            } catch(eCloud) {
+              console.warn("[CloudSync] Không thể đồng bộ qua Cloud, chuyển sang cập nhật nội bộ:", eCloud);
             }
+          }
+
+          if (!syncDone) {
             try {
               await executeWithCrossTabLock(async (lockCtx) => {
                 const res = performAtomicSystemMigration(true, lockCtx);
                 if (res.success) {
-                  refreshAllAfterSync();
-                  closeSyncModal();
+                  syncDone = true;
                   if (res.addedCount > 0 || res.updatedCount > 0) {
                     showToast(`✅ Đã cập nhật ${res.updatedCount || 0} và thêm ${res.addedCount || 0} liên kết mới!`);
                   } else {
@@ -9532,10 +9542,19 @@
               showToast(`❌ Thao tác bị chặn (Fail-Closed): ${lockErr.message || "Không thể xác lập khóa đa thẻ"}`, "error");
             }
           }
+
+          currentCategory = "all";
+          refreshAllAfterSync();
+          closeSyncModal();
+          btnSyncSystemDefaults.disabled = false;
+          if (syncLbl) syncLbl.textContent = "🔄 Cập Nhật Liên Kết Mới Từ Hệ Thống";
+          if (syncDesc) syncDesc.textContent = "Tự động nạp bổ sung các website mới từ trường (giữ nguyên dữ liệu cá nhân)";
         };
+
         btnSyncSystemDefaults.addEventListener("click", () => {
           if (!isAdminLoggedIn) {
-            showToast("🔐 Vui lòng đăng nhập Admin để cập nhật liên kết hệ thống!", "warning");
+            closeSyncModal();
+            showToast("🔐 Vui lòng nhập mã PIN Admin (2026) để cập nhật liên kết hệ thống!", "info");
             openAdminAuthModal(executeSyncDefaults, "sync_defaults");
             return;
           }
@@ -10910,16 +10929,47 @@
       }
 
       if (btnApplyUpdate) {
-        btnApplyUpdate.addEventListener("click", () => {
+        btnApplyUpdate.addEventListener("click", async () => {
+          updateApproved = true;
+          btnApplyUpdate.disabled = true;
+          btnApplyUpdate.textContent = "⏳ Đang nạp...";
+          showToast("🚀 Đang kích hoạt phiên bản mới...");
+
           const worker = waitingWorker || (swRegistration && swRegistration.waiting);
           if (worker) {
-            updateApproved = true;
-            showToast("🚀 Đang kích hoạt phiên bản mới...");
-            worker.postMessage({ action: "skipWaiting" });
-          } else {
-            hideUpdateBanner();
-            showToast("Ứng dụng đã ở trạng thái mới nhất!");
+            try {
+              worker.postMessage({ action: "skipWaiting" });
+            } catch(eMsg) {
+              console.warn("[SW Update] Lỗi postMessage:", eMsg);
+            }
           }
+
+          // Dọn dẹp cache cũ nếu có API caches
+          if ("caches" in window) {
+            try {
+              const keys = await caches.keys();
+              await Promise.all(keys.map(k => {
+                if (k !== "teacher-hub-v2.3.1") return caches.delete(k);
+              }));
+            } catch(eCache) {
+              console.warn("[SW Update] Lỗi xóa cache cũ:", eCache);
+            }
+          }
+
+          // Fail-safe force reload: Đảm bảo trang BẮT BUỘC reload trong 500ms kể cả khi controllerchange không kích hoạt
+          let hasTriggeredReload = false;
+          const doForceReload = () => {
+            if (hasTriggeredReload) return;
+            hasTriggeredReload = true;
+            isRefreshing = true;
+            const baseUrl = window.location.href.split("?")[0].split("#")[0];
+            window.location.replace(baseUrl + "?t=" + Date.now());
+          };
+
+          if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.addEventListener("controllerchange", doForceReload, { once: true });
+          }
+          setTimeout(doForceReload, 500);
         });
       }
 
@@ -10939,24 +10989,39 @@
             showToast("📶 Đang ở chế độ ngoại tuyến, không thể kiểm tra bản cập nhật mới.", "warning");
             return;
           }
-          if (!swRegistration) {
-            showToast("Đang kết nối Service Worker, vui lòng thử lại sau giây lát.", "info");
-            return;
-          }
 
-          showToast("🔄 Đang kiểm tra bản cập nhật mới nhất từ máy chủ...");
+          btnCheckAppUpdateNow.disabled = true;
+          const origText = btnCheckAppUpdateNow.textContent;
+          btnCheckAppUpdateNow.textContent = "⏳ Đang kiểm tra...";
+          showToast("🔄 Đang kiểm tra bản cập nhật mới và dữ liệu đám mây...");
+
           try {
-            await swRegistration.update();
-            if (swRegistration.waiting) {
+            // 1. Kiểm tra cập nhật Service Worker PWA
+            if (swRegistration) {
+              try {
+                await swRegistration.update();
+              } catch(eSw) {
+                console.warn("[SW] Lỗi update:", eSw);
+              }
+            }
+
+            // 2. Đồng thời kiểm tra đồng bộ dữ liệu đám mây từ máy chủ trường
+            const cloudRes = await checkCloudSystemUpdates(true);
+            if (cloudRes && cloudRes.success && (cloudRes.addedCount > 0 || cloudRes.updatedCount > 0)) {
+              currentCategory = "all";
+              refreshAllAfterSync();
+              showToast(`🎉 Đã cập nhật xong! Bổ sung ${cloudRes.addedCount} và cập nhật ${cloudRes.updatedCount} liên kết mới!`);
+            } else if (swRegistration && swRegistration.waiting) {
               showUpdateBanner(swRegistration.waiting);
-            } else if (swRegistration.installing) {
-              showToast("📦 Đang tải về bản cập nhật mới ngầm trong nền...");
             } else {
-              showToast(`🎉 Thầy/Cô đang sử dụng phiên bản mới nhất (v${APP_VERSION})!`);
+              showToast(`🎉 Thầy/Cô đang sử dụng phiên bản mới nhất (v${APP_VERSION}) với đầy đủ liên kết!`);
             }
           } catch(err) {
             console.warn("[SW Update] Lỗi khi kiểm tra:", err);
             showToast("Không thể kết nối máy chủ để kiểm tra cập nhật", "error");
+          } finally {
+            btnCheckAppUpdateNow.disabled = false;
+            btnCheckAppUpdateNow.textContent = origText;
           }
         });
       }
@@ -12479,6 +12544,14 @@
           if (!isFileProtocol) {
             checkCloudSystemUpdates(false).catch(err => {
               console.warn("[CloudSync] Kiểm tra khi kết nối lại mạng gặp lỗi:", err);
+            });
+          }
+        });
+
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible" && !isFileProtocol && typeof navigator !== "undefined" && navigator.onLine) {
+            checkCloudSystemUpdates(false).catch(err => {
+              console.warn("[CloudSync] Kiểm tra khi mở lại app gặp lỗi:", err);
             });
           }
         });

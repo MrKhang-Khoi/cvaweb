@@ -1,9 +1,9 @@
 /* ==========================================================================
    SERVICE WORKER: CỔNG WEBSITE GIÁO VIÊN (PWA OFFLINE-FIRST & AUTO-UPDATE)
-   Phiên bản: 2.3.0
+   Phiên bản: 2.3.1
    ========================================================================== */
 
-const CACHE_NAME = 'teacher-hub-v2.3.0';
+const CACHE_NAME = 'teacher-hub-v2.3.1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -48,13 +48,38 @@ self.addEventListener('activate', event => {
   );
 });
 
-// 3. ĐÓN BẮT TRUY VẤN MẠNG (FETCH): Stale-While-Revalidate với ignoreSearch & Offline Fallback
+// 3. ĐÓN BẮT TRUY VẤN MẠNG (FETCH): Network-First cho điều hướng trang, Stale-While-Revalidate cho tài nguyên tĩnh
 self.addEventListener('fetch', event => {
   const req = event.request;
   const url = new URL(req.url);
 
   // Chỉ cache các tài nguyên cùng nguồn gốc (local origin)
   if (url.origin === location.origin) {
+    // 3.1. Điều hướng trang chính (HTML): Network-First để điện thoại luôn nhận bản HTML mới nhất
+    if (req.mode === 'navigate') {
+      event.respondWith(
+        fetch(req).then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200) {
+            const resClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(req, resClone));
+          }
+          return networkResponse;
+        }).catch(async () => {
+          // Mất mạng: Phục vụ ngay bản index.html đã cache ngoại tuyến
+          const cache = await caches.open(CACHE_NAME);
+          const cached = await cache.match(req, { ignoreSearch: true }) || await cache.match('./index.html', { ignoreSearch: true });
+          if (cached) return cached;
+          return new Response('Ngoại tuyến: Tài nguyên chưa được lưu trong bộ nhớ đệm.', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+          });
+        })
+      );
+      return;
+    }
+
+    // 3.2. Tài nguyên tĩnh (icons, js, css): Stale-While-Revalidate
     event.respondWith(
       caches.open(CACHE_NAME).then(cache => {
         return cache.match(req, { ignoreSearch: true }).then(cachedResponse => {
@@ -65,11 +90,6 @@ self.addEventListener('fetch', event => {
             }
             return networkResponse;
           }).catch(async () => {
-            // Mất mạng: Nếu là điều hướng trang, trả về index.html đã cache
-            if (req.mode === 'navigate') {
-              const fallback = await cache.match('./index.html', { ignoreSearch: true });
-              if (fallback) return fallback;
-            }
             if (cachedResponse) return cachedResponse;
             return new Response('Ngoại tuyến: Tài nguyên chưa được lưu trong bộ nhớ đệm.', {
               status: 503,

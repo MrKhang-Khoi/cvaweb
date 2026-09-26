@@ -5133,7 +5133,7 @@ console.log('\n📌 7.7 Kiểm tra Toàn diện Module Đồng bộ Đám mây C
   assert(htmlContent.includes('teacher_hub_cloud_synced_at'), 'Cloud Sync Marker: Ghi nhận dấu mốc đồng bộ teacher_hub_cloud_synced_at để tối ưu hóa lưu lượng tải');
   assert(htmlContent.includes('cloudLinksMap.has(locLink.id)') && htmlContent.includes('localLinkIds.has(cLink.id)'), 'Smart Merge Algorithm: Triệt để bảo toàn liên kết cá nhân của giáo viên và cập nhật đè link hệ thống');
   assert(htmlContent.includes('validCloudCats.forEach') && htmlContent.includes('catMap.has(cCat.id)'), 'Smart Category Merge: Tự động nạp danh mục mới từ trường mà không ghi đè danh mục cá nhân');
-  assert(swContent.includes("CACHE_NAME = 'teacher-hub-v2.3.0'"), 'PWA Cache Invariant: Service Worker sw.js nâng cấp lên CACHE_NAME teacher-hub-v2.3.0');
+  assert(swContent.includes("CACHE_NAME = 'teacher-hub-v2.3.1'"), 'PWA Cache Invariant: Service Worker sw.js nâng cấp lên CACHE_NAME teacher-hub-v2.3.1');
 }
 
 // 8. KIỂM THỬ PLAYWRIGHT E2E TRÌNH DUYỆT THẬT (DUAL ENVIRONMENT: FILE:/// VÀ HTTP://LOCALHOST)

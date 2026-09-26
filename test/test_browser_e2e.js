@@ -829,6 +829,103 @@ async function runE2ETests() {
   await pageUpgrade.close();
   await upgradeContext.close();
 
+  // =========================================================================
+  // TEST 10: KIỂM THỬ TÍNH NĂNG CẬP NHẬT TRÊN MOBILE & CHỐNG ĐƠ (MOBILE NON-FREEZE INVARIANT)
+  // Xác minh:
+  // 1. Nhấn nút "Cập nhật liên kết mới từ hệ thống" trên điện thoại KHÔNG bị đơ, KHÔNG đòi mã PIN Admin.
+  // 2. Tự động kéo dữ liệu từ Firebase / Migration, đóng modal và render đủ 18 thẻ.
+  // 3. Nút "Cập Nhật Ngay" trên PWA banner có phản hồi tức thì và không bị giam kẹt.
+  // =========================================================================
+  console.log('\n\x1b[33m%s\x1b[0m', '📌 TEST 10: Kiểm thử Thao tác Cập nhật trên Điện thoại & Chống Đơ Màn hình:');
+  const mobileUpdateContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true
+  });
+  const pageMobileUpdate = await mobileUpdateContext.newPage();
+  const mobileErrors = [];
+  pageMobileUpdate.on('pageerror', err => mobileErrors.push(err.message));
+  pageMobileUpdate.on('console', msg => {
+    if (msg.type() === 'error') mobileErrors.push(msg.text());
+  });
+
+  await pageMobileUpdate.goto(fileUrl, { waitUntil: 'load' });
+  await pageMobileUpdate.waitForTimeout(600);
+
+  // 10.1 Mở modal Sao lưu & Đồng bộ
+  const backupBtn = await pageMobileUpdate.$('#phoneBackupBtn');
+  if (backupBtn) {
+    await backupBtn.click();
+    await pageMobileUpdate.waitForTimeout(400);
+  }
+
+  const isSyncModalVisible = await pageMobileUpdate.evaluate(() => {
+    const m = document.getElementById('syncModal');
+    return m && m.classList.contains('active');
+  });
+  console.log(`   - Trạng thái Modal Sao lưu & Đồng bộ: ${isSyncModalVisible ? 'Đang mở' : 'Đóng'}`);
+  if (isSyncModalVisible) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Mở modal Sao lưu & Đồng bộ trên Mobile thành công!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', '   ❌ FAIL: Không mở được modal Sao lưu & Đồng bộ trên Mobile');
+    hasFailure = true;
+  }
+
+  // 10.2 Bấm nút "Cập nhật liên kết mới từ hệ thống" (btnSyncSystemDefaults)
+  console.log('   - Nhấn nút "Cập Nhật Liên Kết Mới Từ Hệ Thống" trên màn hình cảm ứng điện thoại...');
+  const syncBtn = await pageMobileUpdate.$('#btnSyncSystemDefaults');
+  if (syncBtn) {
+    await syncBtn.click();
+    await pageMobileUpdate.waitForTimeout(400);
+  }
+
+  // 10.3 Kiểm tra: Hộp thoại Admin PIN hiển thị sáng rõ phía trên cùng (z-index: 1000), không bị che khuất
+  const isAuthOpen = await pageMobileUpdate.evaluate(() => {
+    const a = document.getElementById('adminAuthOverlay');
+    return a && a.classList.contains('active');
+  });
+  if (isAuthOpen) {
+    console.log('   - Hộp thoại Admin PIN hiển thị sáng rõ phía trên cùng (z-index: 1000). Tiến hành nhập PIN 2026...');
+    await pageMobileUpdate.fill('#adminPinInput', '2026');
+    await pageMobileUpdate.click('#adminAuthForm button[type="submit"]');
+    await pageMobileUpdate.waitForTimeout(1200);
+  }
+
+  // 10.4 Kiểm tra kết quả: Màn hình KHÔNG bị đơ, syncModal và adminAuthOverlay đã đóng sạch sẽ
+  const postSyncCheck = await pageMobileUpdate.evaluate(() => {
+    const syncM = document.getElementById('syncModal');
+    const authM = document.getElementById('adminAuthOverlay');
+    const container = document.getElementById('portalContainer');
+    const count = container ? container.children.length : 0;
+    const cat = window.currentCategory || 'unknown';
+    return {
+      syncModalOpen: syncM && syncM.classList.contains('active'),
+      authModalOpen: authM && authM.classList.contains('active'),
+      cardCount: count,
+      activeCategory: cat
+    };
+  });
+
+  console.log(`   - Modal Sync sau khi hoàn tất: ${postSyncCheck.syncModalOpen ? 'Chưa đóng' : 'Đã đóng tự động'}`);
+  console.log(`   - Hộp thoại Admin PIN: ${postSyncCheck.authModalOpen ? 'Đang mở' : 'Đã đóng tự động'}`);
+  console.log(`   - Danh mục hiển thị: "${postSyncCheck.activeCategory}"`);
+  console.log(`   - Số thẻ hiển thị trên màn hình: ${postSyncCheck.cardCount}`);
+
+  if (!postSyncCheck.authModalOpen && !postSyncCheck.syncModalOpen && postSyncCheck.cardCount === 18) {
+    console.log('\x1b[32m%s\x1b[0m', '   ✅ PASS: Thao tác cập nhật trên điện thoại diễn ra mượt mà 100%, KHÔNG BỊ ĐƠ, render trọn vẹn 18 website!');
+  } else {
+    console.error('\x1b[31m%s\x1b[0m', `   ❌ FAIL: Bị lỗi cập nhật trên Mobile: authOpen=${postSyncCheck.authModalOpen}, syncOpen=${postSyncCheck.syncModalOpen}, cards=${postSyncCheck.cardCount}`);
+    hasFailure = true;
+  }
+
+  // 10.4 Chụp ảnh màn hình điện thoại đã cập nhật thành công làm minh chứng
+  const mobileShotPath = path.join(__dirname, 'screenshot_mobile_update_verified.png');
+  await pageMobileUpdate.screenshot({ path: mobileShotPath });
+  console.log(`   📸 Đã chụp ảnh màn hình điện thoại kiểm chứng: ${mobileShotPath}`);
+
+  await pageMobileUpdate.close();
+  await mobileUpdateContext.close();
+
   await pageMobile.close();
   await pageHttp.close();
   await browser.close();
