@@ -9906,14 +9906,10 @@
       function showToast(msg, type = "info") {
         const box = document.getElementById("toastBox");
         if (!box) return;
-        if (type !== "info" || !msg.startsWith("🔄")) {
-          const prevLoading = box.querySelectorAll(".phone-toast");
-          prevLoading.forEach(el => {
-            if (el.textContent && el.textContent.startsWith("🔄")) {
-              el.remove();
-            }
-          });
-        }
+        // Xóa sạch các thông báo cũ để chỉ hiển thị 1 thông báo mới nhất rõ ràng, không che khuất màn hình
+        const oldToasts = box.querySelectorAll(".phone-toast");
+        oldToasts.forEach(el => el.remove());
+
         const t = document.createElement("div");
         t.className = "phone-toast" + (type === "error" ? " toast-error" : (type === "warning" ? " toast-warning" : ""));
         t.textContent = msg;
